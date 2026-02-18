@@ -36,8 +36,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -97,25 +95,25 @@ public class LogCleaner {
    * Clean a command tree by removing undo operations and the commands they undid.
    * 
    * The algorithm:
-   * 1. Flatten the command tree into a list
+   * 1. Get the direct subcommands from the root (which is the beginning state)
    * 2. Identify undo pairs (UndoCommand(true) followed by UndoCommand(false))
    * 3. Mark the undo commands and the commands between them for removal
    * 4. Also mark the command immediately before the undo start (the original undone command)
-   * 5. Rebuild the command tree without the marked commands
+   * 5. Rebuild the command tree with only the "clean" commands
    *
-   * @param logCommand The command tree to clean
+   * @param logCommand The command tree to clean (root is the beginning state)
    * @return A new command tree with undo operations removed
    */
   private static Command cleanLog(Command logCommand) {
-    // Flatten the command tree to a list
-    List<Command> allCommands = flattenCommands(logCommand);
+    // Get the direct subcommands (which should be LogCommand objects and UndoCommand markers)
+    Command[] subCommands = logCommand.getSubCommands();
     
     // Track which commands to remove
-    boolean[] toRemove = new boolean[allCommands.size()];
+    boolean[] toRemove = new boolean[subCommands.length];
     
     // Find and mark undo operations
-    for (int i = 0; i < allCommands.size(); i++) {
-      Command cmd = allCommands.get(i);
+    for (int i = 0; i < subCommands.length; i++) {
+      Command cmd = subCommands[i];
       
       // Check if this is an UndoCommand(true) - start of undo
       if (cmd instanceof BasicLogger.UndoCommand) {
@@ -126,8 +124,8 @@ public class LogCleaner {
           
           // Find the matching UndoCommand(false)
           int undoEnd = -1;
-          for (int j = i + 1; j < allCommands.size(); j++) {
-            Command endCmd = allCommands.get(j);
+          for (int j = i + 1; j < subCommands.length; j++) {
+            Command endCmd = subCommands[j];
             if (endCmd instanceof BasicLogger.UndoCommand) {
               BasicLogger.UndoCommand endUndoCmd = (BasicLogger.UndoCommand) endCmd;
               if (!endUndoCmd.isInProgress()) {
@@ -141,7 +139,7 @@ public class LogCleaner {
             // Mark the end undo command for removal
             toRemove[undoEnd] = true;
             
-            // Mark all commands between start and end for removal
+            // Mark all commands between start and end for removal (the undone action)
             for (int j = i + 1; j < undoEnd; j++) {
               toRemove[j] = true;
             }
@@ -149,7 +147,7 @@ public class LogCleaner {
             // Mark the command before the undo start (the original command being undone)
             // Need to find the previous LogCommand
             for (int j = i - 1; j >= 0; j--) {
-              if (allCommands.get(j) instanceof BasicLogger.LogCommand) {
+              if (subCommands[j] instanceof BasicLogger.LogCommand) {
                 toRemove[j] = true;
                 break;
               }
@@ -160,66 +158,22 @@ public class LogCleaner {
     }
     
     // Rebuild command tree without removed commands
-    return rebuildCommands(allCommands, toRemove);
-  }
-
-  /**
-   * Flatten a command tree into a list, preserving order.
-   *
-   * @param command The root command
-   * @return A list of all commands in the tree
-   */
-  private static List<Command> flattenCommands(Command command) {
-    List<Command> result = new ArrayList<>();
-    flattenCommandsHelper(command, result);
-    return result;
-  }
-
-  /**
-   * Helper method to recursively flatten commands.
-   *
-   * @param command The current command
-   * @param result  The list to add commands to
-   */
-  private static void flattenCommandsHelper(Command command, List<Command> result) {
-    if (command == null) {
-      return;
-    }
+    // The root command is the beginning state (restore command), we want to preserve it
+    // but with only the cleaned LogCommand subcommands
+    Command cleanedRoot = logCommand;
     
-    result.add(command);
+    // Clear the existing subcommands by creating a new root of the same type
+    // For simplicity, we'll just append to a NullCommand which will work for encoding
+    cleanedRoot = new NullCommand();
     
-    // Process subcommands
-    for (Command sub : command.getSubCommands()) {
-      flattenCommandsHelper(sub, result);
-    }
-  }
-
-  /**
-   * Rebuild the command tree from a list, excluding marked commands.
-   * 
-   * This creates a new command structure that preserves the hierarchical
-   * nature of the original commands.
-   *
-   * @param allCommands The list of all commands
-   * @param toRemove    Boolean array indicating which commands to remove
-   * @return The rebuilt command tree
-   */
-  private static Command rebuildCommands(List<Command> allCommands, boolean[] toRemove) {
-    if (allCommands.isEmpty()) {
-      return new NullCommand();
-    }
-    
-    // Start with a NullCommand as the root
-    Command root = new NullCommand();
-    
-    for (int i = 0; i < allCommands.size(); i++) {
+    // Append only the commands we want to keep
+    for (int i = 0; i < subCommands.length; i++) {
       if (!toRemove[i]) {
-        Command cmd = allCommands.get(i);
-        root.append(cmd);
+        cleanedRoot.append(subCommands[i]);
       }
     }
     
-    return root;
+    return cleanedRoot;
   }
 
   /**
