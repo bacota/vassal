@@ -48,3 +48,4 @@ debian/files
 debian/vassal.substvars
 debian/vassal
 deprecated
+dependency-reduced-pom.xml

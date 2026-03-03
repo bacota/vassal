@@ -111,6 +111,7 @@ $(TMPDIR) $(JDOCDIR):
 $(LIBDIR)/Vengine.jar: version-set
 	$(MVN) deploy -DgitVersion=$(VERSION) -Dasciidoctor.attributes=optimize $(SKIPS)
 	mv $(LIBDIR)/$(JARNAME).jar $@
+	cp vassal-app/target/$(JARNAME)-uber.jar $(LIBDIR)/Vengine-uber.jar
 
 $(TMPDIR)/module_deps: $(LIBDIR)/Vengine.jar | $(TMPDIR)
 	echo -n jdk.crypto.ec, >$@
