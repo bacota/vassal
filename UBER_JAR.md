@@ -10,18 +10,34 @@ The VASSAL project now supports building an "uber jar" (also known as a "fat jar
 - Java 11 or higher
 - Maven 3.5 or higher
 
-### Build Command
+### Build Commands
 
-To build the uber jar, run:
+#### Using Maven (Direct)
+
+To build the uber jar directly with Maven:
 
 ```bash
 mvn clean package
 ```
 
-This will create both the regular JAR and the uber JAR in the `vassal-app/target/` directory:
+#### Using Makefile (Recommended)
 
-- `vassal-app-<version>.jar` - Regular JAR (~5.5 MB) - requires dependencies in classpath
-- `vassal-app-<version>-uber.jar` - Uber JAR (~19 MB) - contains all dependencies
+To build and copy jars to the lib directory:
+
+```bash
+make jar
+```
+
+This will create both the regular JAR and the uber JAR in multiple locations:
+
+**Maven target directory** (`vassal-app/target/`):
+- `vassal-app-<version>.jar` - Regular JAR (~5.5 MB)
+- `vassal-app-<version>-uber.jar` - Uber JAR (~19 MB)
+
+**Distribution lib directory** (`release-prepare/target/lib/`):
+- `Vengine.jar` - Regular JAR (~5.5 MB) - requires dependencies in classpath
+- `Vengine-uber.jar` - Uber JAR (~19 MB) - contains all dependencies
+- All individual dependency JARs
 
 ### Build Output
 
@@ -31,14 +47,23 @@ vassal-app/target/
 ├── vassal-app-3.8.0-SNAPSHOT-uber.jar    # Uber JAR with all dependencies
 ├── vassal-app-3.8.0-SNAPSHOT-sources.jar # Source code
 └── vassal-app-3.8.0-SNAPSHOT-javadoc.jar # JavaDoc
+
+release-prepare/target/lib/
+├── Vengine.jar                            # Regular JAR (copied by Makefile)
+├── Vengine-uber.jar                       # Uber JAR (copied by Makefile)
+└── [all dependency JARs]                  # Individual dependencies
 ```
 
 ## Running the Uber Jar
 
-The uber jar is self-contained and can be executed directly:
+The uber jar is self-contained and can be executed directly from either location:
 
 ```bash
+# From Maven target directory
 java -jar vassal-app/target/vassal-app-3.8.0-SNAPSHOT-uber.jar
+
+# From distribution lib directory
+java -jar release-prepare/target/lib/Vengine-uber.jar
 ```
 
 ### Advantages of the Uber Jar
@@ -73,11 +98,26 @@ The uber jar is created using the Maven Shade Plugin with the following features
   - Apache license transformer
 - **Filters**: Excludes signature files (*.SF, *.DSA, *.RSA) to prevent security exceptions
 
+### Makefile Integration
+
+The Makefile has been updated to automatically copy the uber jar to the distribution library directory:
+
+**Modified Target** (line 111-114 in Makefile):
+```makefile
+$(LIBDIR)/Vengine.jar: version-set
+	$(MVN) deploy -DgitVersion=$(VERSION) -Dasciidoctor.attributes=optimize $(SKIPS)
+	mv $(LIBDIR)/$(JARNAME).jar $@
+	cp vassal-app/target/$(JARNAME)-uber.jar $(LIBDIR)/Vengine-uber.jar
+```
+
+This ensures that when you run `make jar`, both the regular jar and uber jar are placed in `release-prepare/target/lib/` for distribution.
+
 ### Configuration Location
 
 The Maven Shade Plugin configuration is located in:
 - `vassal-app/pom.xml` - Plugin execution configuration
 - `pom.xml` - Plugin version management in pluginManagement section
+- `Makefile` - Copy command to distribution lib directory
 
 ## Troubleshooting
 
