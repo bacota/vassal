@@ -43,8 +43,11 @@ import java.util.List;
  *
  * <p>Usage:
  * <pre>
- *   java VASSAL.tools.VlogConcatenator &lt;module.vmod&gt; &lt;first.vlog&gt; &lt;second.vlog&gt; &lt;output.vlog&gt;
+ *   java VASSAL.tools.VlogConcatenator &lt;module-zip&gt; &lt;first.vlog&gt; &lt;second.vlog&gt; &lt;output.vlog&gt;
  * </pre>
+ *
+ * <p>The first argument is the path to the ZIP archive containing the module
+ * (typically a {@code .vmod} file, which is a ZIP archive).
  */
 public class VlogConcatenator {
 
@@ -53,17 +56,17 @@ public class VlogConcatenator {
     System.setProperty("java.awt.headless", "true"); //NON-NLS
 
     if (args.length != 4) {
-      System.err.println("Usage: VASSAL.tools.VlogConcatenator <module.vmod> <first.vlog> <second.vlog> <output.vlog>"); //NON-NLS
+      System.err.println("Usage: VASSAL.tools.VlogConcatenator <module-zip> <first.vlog> <second.vlog> <output.vlog>"); //NON-NLS
       System.exit(1);
     }
 
-    final File moduleFile  = new File(args[0]);
+    final File moduleZip   = new File(args[0]);
     final File firstVlog   = new File(args[1]);
     final File secondVlog  = new File(args[2]);
     final File outputFile  = new File(args[3]);
 
-    if (!moduleFile.exists()) {
-      System.err.println("Module file not found: " + moduleFile); //NON-NLS
+    if (!moduleZip.exists()) {
+      System.err.println("Module zip archive not found: " + moduleZip); //NON-NLS
       System.exit(1);
     }
     if (!firstVlog.exists()) {
@@ -81,7 +84,7 @@ public class VlogConcatenator {
 
     try {
       // Initialize the module so that CommandEncoder infrastructure is available
-      GameModule.init(new GameModule(new DataArchive(moduleFile.getPath())));
+      GameModule.init(new GameModule(new DataArchive(moduleZip.getPath())));
 
       final GameModule gm = GameModule.getGameModule();
       final GameState  gs = gm.getGameState();
