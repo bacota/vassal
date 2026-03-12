@@ -455,5 +455,376 @@ class CommandInterpreterTest {
     assertDoesNotThrow(() -> interp.encode(new FlareCommandADT("f0", 0, 0)));
     assertDoesNotThrow(() -> interp.encode(new ConditionalCommandADT(
         new ConditionalCommand.Condition[0], new NullCommandADT())));
+    // New command types
+    assertDoesNotThrow(() -> interp.encode(new SetupCommandADT(true)));
+    assertDoesNotThrow(() -> interp.encode(new BasicLoggerUndoCommandADT(false)));
+    assertDoesNotThrow(() -> interp.encode(new BasicLoggerLogCommandADT(new NullCommandADT())));
+    assertDoesNotThrow(() -> interp.encode(new ModuleExtensionRegCmdADT("MyExt", "1.0")));
+    assertDoesNotThrow(() -> interp.encode(new ObscurableOptionsSetAllowedADT(List.of("id1", "id2"))));
+    assertDoesNotThrow(() -> interp.encode(new NewGameIndicatorMarkGameNotNewADT()));
+    assertDoesNotThrow(() -> interp.encode(new ChatterDisplayTextADT("hello")));
+    assertDoesNotThrow(() -> interp.encode(new NotesWindowSetScenarioNoteADT("scenario")));
+    assertDoesNotThrow(() -> interp.encode(new NotesWindowSetPublicNoteADT("public")));
+    assertDoesNotThrow(() -> interp.encode(new PlayerRosterAddADT("pid", "Alice", "Allies")));
+    assertDoesNotThrow(() -> interp.encode(new PlayerRosterRemoveADT("pid")));
+    assertDoesNotThrow(() -> interp.encode(new EventLogStoreEventsADT("events")));
+    assertDoesNotThrow(() -> interp.encode(new TurnTrackerSetTurnADT("tt0", "state1", "state0")));
+    assertDoesNotThrow(() -> interp.encode(
+        new GlobalPropertySetGlobalPropertyADT("prop", "cid", "old", "new")));
+    assertDoesNotThrow(() -> interp.encode(
+        new LOSThreadLOSCommandADT("los0", 1,2,3,4,true,false,false, 0,0,0,0,false,false)));
+    assertDoesNotThrow(() -> interp.encode(
+        new SpecialDiceButtonShowResultsADT("sdb0", new int[]{1,2,3})));
+    assertDoesNotThrow(() -> interp.encode(new BoardPickerSetBoardsADT("mapId",
+        List.of(new BoardPickerSetBoardsADT.BoardEntry("BoardA", false, 0, 0)))));
+    assertDoesNotThrow(() -> interp.encode(new DeckLoadDeckCommandADT("deck1")));
+    assertDoesNotThrow(() -> interp.encode(
+        new LockScenarioOptionsTabADT("tab", "Bob", "pw", "2024-01-01", "", "", "")));
+    assertDoesNotThrow(() -> interp.encode(
+        new AddSecretNoteCommandADT("note1", "owner1", "text1", true, -1L, "handle1")));
+    assertDoesNotThrow(() -> interp.encode(new SetPrivateTextCommandADT("owner1", "private text")));
+    assertDoesNotThrow(() -> interp.encode(
+        new ChangePropertyCommandADT("container1", "prop1", "old", "new")));
+    assertDoesNotThrow(() -> interp.encode(new InviteCommandADT("Alice", "pid", "room1")));
+    assertDoesNotThrow(() -> interp.encode(new PrivMsgCommandADT("Alice", "hi!")));
+    assertDoesNotThrow(() -> interp.encode(new SynchCommandADT("Alice")));
+    assertDoesNotThrow(() -> interp.encode(new SoundEncoderCmdADT("wake")));
+    assertDoesNotThrow(() -> interp.encode(new TextClientShowTextADT("hello stdout")));
+  }
+
+  // -----------------------------------------------------------------------
+  // Round-trip tests for the new 27 command types
+  // -----------------------------------------------------------------------
+
+  @Test
+  void roundTrip_setupCommand() {
+    for (final boolean b : new boolean[]{true, false}) {
+      final CommandADT decoded = interpreter.decode(interpreter.encode(new SetupCommandADT(b)));
+      assertInstanceOf(SetupCommandADT.class, decoded);
+      assertEquals(b, ((SetupCommandADT) decoded).isGameStarting());
+    }
+  }
+
+  @Test
+  void roundTrip_basicLoggerUndoCommand() {
+    for (final boolean b : new boolean[]{true, false}) {
+      final CommandADT decoded = interpreter.decode(interpreter.encode(new BasicLoggerUndoCommandADT(b)));
+      assertInstanceOf(BasicLoggerUndoCommandADT.class, decoded);
+      assertEquals(b, ((BasicLoggerUndoCommandADT) decoded).isInProgress());
+    }
+  }
+
+  @Test
+  void roundTrip_basicLoggerLogCommand() {
+    final BasicLoggerLogCommandADT cmd = new BasicLoggerLogCommandADT(new AlertCommandADT("inner"));
+    final CommandADT decoded = interpreter.decode(interpreter.encode(cmd));
+    assertInstanceOf(BasicLoggerLogCommandADT.class, decoded);
+    assertInstanceOf(AlertCommandADT.class, ((BasicLoggerLogCommandADT) decoded).getLoggedCommand());
+    assertEquals("inner", ((AlertCommandADT)
+        ((BasicLoggerLogCommandADT) decoded).getLoggedCommand()).getMessage());
+  }
+
+  @Test
+  void roundTrip_moduleExtensionRegCmd() {
+    final CommandADT decoded = interpreter.decode(
+        interpreter.encode(new ModuleExtensionRegCmdADT("MyExt", "2.3.0")));
+    assertInstanceOf(ModuleExtensionRegCmdADT.class, decoded);
+    assertEquals("MyExt", ((ModuleExtensionRegCmdADT) decoded).getName());
+    assertEquals("2.3.0", ((ModuleExtensionRegCmdADT) decoded).getVersion());
+  }
+
+  @Test
+  void roundTrip_obscurableOptionsSetAllowed() {
+    final List<String> ids = List.of("player1", "player2");
+    final CommandADT decoded = interpreter.decode(
+        interpreter.encode(new ObscurableOptionsSetAllowedADT(ids)));
+    assertInstanceOf(ObscurableOptionsSetAllowedADT.class, decoded);
+    assertEquals(ids, ((ObscurableOptionsSetAllowedADT) decoded).getAllowedIds());
+  }
+
+  @Test
+  void roundTrip_obscurableOptionsSetAllowed_empty() {
+    final CommandADT decoded = interpreter.decode(
+        interpreter.encode(new ObscurableOptionsSetAllowedADT(List.of())));
+    assertInstanceOf(ObscurableOptionsSetAllowedADT.class, decoded);
+    assertTrue(((ObscurableOptionsSetAllowedADT) decoded).getAllowedIds().isEmpty());
+  }
+
+  @Test
+  void roundTrip_newGameIndicatorMarkGameNotNew() {
+    final CommandADT decoded = interpreter.decode(
+        interpreter.encode(new NewGameIndicatorMarkGameNotNewADT()));
+    assertInstanceOf(NewGameIndicatorMarkGameNotNewADT.class, decoded);
+  }
+
+  @Test
+  void roundTrip_chatterDisplayText() {
+    final CommandADT decoded = interpreter.decode(
+        interpreter.encode(new ChatterDisplayTextADT("Hello world")));
+    assertInstanceOf(ChatterDisplayTextADT.class, decoded);
+    assertEquals("Hello world", ((ChatterDisplayTextADT) decoded).getMessage());
+  }
+
+  @Test
+  void roundTrip_notesWindowSetScenarioNote() {
+    final CommandADT decoded = interpreter.decode(
+        interpreter.encode(new NotesWindowSetScenarioNoteADT("Scenario note")));
+    assertInstanceOf(NotesWindowSetScenarioNoteADT.class, decoded);
+    assertEquals("Scenario note", ((NotesWindowSetScenarioNoteADT) decoded).getMessage());
+  }
+
+  @Test
+  void roundTrip_notesWindowSetPublicNote() {
+    final CommandADT decoded = interpreter.decode(
+        interpreter.encode(new NotesWindowSetPublicNoteADT("Public note")));
+    assertInstanceOf(NotesWindowSetPublicNoteADT.class, decoded);
+    assertEquals("Public note", ((NotesWindowSetPublicNoteADT) decoded).getMessage());
+  }
+
+  @Test
+  void roundTrip_playerRosterAdd() {
+    final CommandADT decoded = interpreter.decode(
+        interpreter.encode(new PlayerRosterAddADT("pid1", "Alice", "Allies")));
+    assertInstanceOf(PlayerRosterAddADT.class, decoded);
+    final PlayerRosterAddADT d = (PlayerRosterAddADT) decoded;
+    assertEquals("pid1", d.getPlayerId());
+    assertEquals("Alice", d.getPlayerName());
+    assertEquals("Allies", d.getSide());
+  }
+
+  @Test
+  void roundTrip_playerRosterRemove() {
+    final CommandADT decoded = interpreter.decode(
+        interpreter.encode(new PlayerRosterRemoveADT("pid2")));
+    assertInstanceOf(PlayerRosterRemoveADT.class, decoded);
+    assertEquals("pid2", ((PlayerRosterRemoveADT) decoded).getPlayerId());
+  }
+
+  @Test
+  void roundTrip_eventLogStoreEvents() {
+    final CommandADT decoded = interpreter.decode(
+        interpreter.encode(new EventLogStoreEventsADT("event1;event2;event3")));
+    assertInstanceOf(EventLogStoreEventsADT.class, decoded);
+    assertEquals("event1;event2;event3", ((EventLogStoreEventsADT) decoded).getEvents());
+  }
+
+  @Test
+  void roundTrip_turnTrackerSetTurn() {
+    final CommandADT decoded = interpreter.decode(
+        interpreter.encode(new TurnTrackerSetTurnADT("tt0", "Round 2", "Round 1")));
+    assertInstanceOf(TurnTrackerSetTurnADT.class, decoded);
+    final TurnTrackerSetTurnADT d = (TurnTrackerSetTurnADT) decoded;
+    assertEquals("tt0", d.getTrackerId());
+    assertEquals("Round 2", d.getNewState());
+    assertEquals("Round 1", d.getOldState());
+  }
+
+  @Test
+  void roundTrip_globalPropertySetGlobalProperty() {
+    final CommandADT decoded = interpreter.decode(interpreter.encode(
+        new GlobalPropertySetGlobalPropertyADT("myProp", "myContainer", "oldVal", "newVal")));
+    assertInstanceOf(GlobalPropertySetGlobalPropertyADT.class, decoded);
+    final GlobalPropertySetGlobalPropertyADT d = (GlobalPropertySetGlobalPropertyADT) decoded;
+    assertEquals("myProp", d.getPropertyName());
+    assertEquals("myContainer", d.getContainerId());
+    assertEquals("oldVal", d.getOldValue());
+    assertEquals("newVal", d.getNewValue());
+  }
+
+  @Test
+  void roundTrip_losThreadLOSCommand() {
+    final LOSThreadLOSCommandADT cmd = new LOSThreadLOSCommandADT(
+        "los0", 10, 20, 30, 40, true, false, false,
+        0, 0, 0, 0, false, false);
+    final CommandADT decoded = interpreter.decode(interpreter.encode(cmd));
+    assertInstanceOf(LOSThreadLOSCommandADT.class, decoded);
+    final LOSThreadLOSCommandADT d = (LOSThreadLOSCommandADT) decoded;
+    assertEquals("los0", d.getThreadId());
+    assertEquals(10, d.getNewAnchorX());
+    assertEquals(20, d.getNewAnchorY());
+    assertEquals(30, d.getNewArrowX());
+    assertEquals(40, d.getNewArrowY());
+    assertTrue(d.isNewPersisting());
+    assertFalse(d.isNewMirroring());
+    assertFalse(d.isReset());
+  }
+
+  @Test
+  void roundTrip_losThreadLOSCommand_reset() {
+    final LOSThreadLOSCommandADT cmd = new LOSThreadLOSCommandADT(
+        "los1", 0, 0, 0, 0, false, false, true,
+        5, 6, 7, 8, false, false);
+    final CommandADT decoded = interpreter.decode(interpreter.encode(cmd));
+    assertInstanceOf(LOSThreadLOSCommandADT.class, decoded);
+    assertTrue(((LOSThreadLOSCommandADT) decoded).isReset());
+  }
+
+  @Test
+  void roundTrip_specialDiceButtonShowResults() {
+    final SpecialDiceButtonShowResultsADT cmd =
+        new SpecialDiceButtonShowResultsADT("sdb0", new int[]{3, 1, 4, 1, 5});
+    final CommandADT decoded = interpreter.decode(interpreter.encode(cmd));
+    assertInstanceOf(SpecialDiceButtonShowResultsADT.class, decoded);
+    final SpecialDiceButtonShowResultsADT d = (SpecialDiceButtonShowResultsADT) decoded;
+    assertEquals("sdb0", d.getButtonId());
+    final int[] rolls = d.getRolls();
+    assertEquals(5, rolls.length);
+    assertEquals(3, rolls[0]);
+    assertEquals(5, rolls[4]);
+  }
+
+  @Test
+  void roundTrip_boardPickerSetBoards_empty() {
+    final CommandADT decoded = interpreter.decode(
+        interpreter.encode(new BoardPickerSetBoardsADT("myMap", List.of())));
+    assertInstanceOf(BoardPickerSetBoardsADT.class, decoded);
+    final BoardPickerSetBoardsADT d = (BoardPickerSetBoardsADT) decoded;
+    assertEquals("myMap", d.getMapId());
+    assertTrue(d.getBoardEntries().isEmpty());
+  }
+
+  @Test
+  void roundTrip_boardPickerSetBoards_withEntries() {
+    final List<BoardPickerSetBoardsADT.BoardEntry> entries = List.of(
+        new BoardPickerSetBoardsADT.BoardEntry("BoardA", true, 3, 7),
+        new BoardPickerSetBoardsADT.BoardEntry("BoardB", false, 0, 0)
+    );
+    final CommandADT decoded = interpreter.decode(
+        interpreter.encode(new BoardPickerSetBoardsADT("myMap", entries)));
+    assertInstanceOf(BoardPickerSetBoardsADT.class, decoded);
+    final List<BoardPickerSetBoardsADT.BoardEntry> decodedEntries =
+        ((BoardPickerSetBoardsADT) decoded).getBoardEntries();
+    assertEquals(2, decodedEntries.size());
+    assertEquals("BoardA", decodedEntries.get(0).name);
+    assertTrue(decodedEntries.get(0).reversed);
+    assertEquals(3, decodedEntries.get(0).relX);
+    assertEquals(7, decodedEntries.get(0).relY);
+    assertEquals("BoardB", decodedEntries.get(1).name);
+  }
+
+  @Test
+  void roundTrip_deckLoadDeckCommand() {
+    final CommandADT decoded = interpreter.decode(
+        interpreter.encode(new DeckLoadDeckCommandADT("deck-42")));
+    assertInstanceOf(DeckLoadDeckCommandADT.class, decoded);
+    assertEquals("deck-42", ((DeckLoadDeckCommandADT) decoded).getDeckId());
+  }
+
+  @Test
+  void roundTrip_lockScenarioOptionsTab() {
+    final CommandADT decoded = interpreter.decode(interpreter.encode(
+        new LockScenarioOptionsTabADT("Tab1", "Bob", "secret", "2024-01-15",
+            "", "", "")));
+    assertInstanceOf(LockScenarioOptionsTabADT.class, decoded);
+    final LockScenarioOptionsTabADT d = (LockScenarioOptionsTabADT) decoded;
+    assertEquals("Tab1", d.getTabName());
+    assertEquals("Bob", d.getLockedBy());
+    assertEquals("secret", d.getLockedPw());
+    assertEquals("2024-01-15", d.getLockedDt());
+  }
+
+  @Test
+  void roundTrip_lockScenarioOptionsTab_undo() {
+    final LockScenarioOptionsTabADT cmd = new LockScenarioOptionsTabADT(
+        "Tab1", "Bob", "pw", "now", "Alice", "pw2", "then");
+    final CommandADT undo = cmd.getUndoCommand();
+    assertInstanceOf(LockScenarioOptionsTabADT.class, undo);
+    final LockScenarioOptionsTabADT u = (LockScenarioOptionsTabADT) undo;
+    assertEquals("Alice", u.getLockedBy());
+    assertEquals("pw2", u.getLockedPw());
+    assertEquals("then", u.getLockedDt());
+    assertEquals("Bob", u.getOldLockedBy());
+  }
+
+  @Test
+  void roundTrip_addSecretNoteCommand() {
+    final long now = 1704067200000L; // 2024-01-01 00:00:00 UTC
+    final CommandADT decoded = interpreter.decode(interpreter.encode(
+        new AddSecretNoteCommandADT("My Note", "owner123", "Note body", true, now, "myHandle")));
+    assertInstanceOf(AddSecretNoteCommandADT.class, decoded);
+    final AddSecretNoteCommandADT d = (AddSecretNoteCommandADT) decoded;
+    assertEquals("My Note", d.getName());
+    assertEquals("owner123", d.getOwner());
+    assertEquals("Note body", d.getText());
+    assertTrue(d.isHidden());
+    assertEquals(now, d.getDateMillis());
+    assertEquals("myHandle", d.getHandle());
+  }
+
+  @Test
+  void roundTrip_addSecretNoteCommand_nullDate() {
+    final CommandADT decoded = interpreter.decode(interpreter.encode(
+        new AddSecretNoteCommandADT("n", "o", "t", false, -1L, "h")));
+    assertInstanceOf(AddSecretNoteCommandADT.class, decoded);
+    assertEquals(-1L, ((AddSecretNoteCommandADT) decoded).getDateMillis());
+  }
+
+  @Test
+  void roundTrip_setPrivateTextCommand() {
+    final CommandADT decoded = interpreter.decode(interpreter.encode(
+        new SetPrivateTextCommandADT("owner1", "private text content")));
+    assertInstanceOf(SetPrivateTextCommandADT.class, decoded);
+    assertEquals("owner1", ((SetPrivateTextCommandADT) decoded).getOwner());
+    assertEquals("private text content", ((SetPrivateTextCommandADT) decoded).getText());
+  }
+
+  @Test
+  void roundTrip_changePropertyCommand() {
+    final CommandADT decoded = interpreter.decode(interpreter.encode(
+        new ChangePropertyCommandADT("container1", "prop1", "oldVal", "newVal")));
+    assertInstanceOf(ChangePropertyCommandADT.class, decoded);
+    final ChangePropertyCommandADT d = (ChangePropertyCommandADT) decoded;
+    assertEquals("container1", d.getContainerId());
+    assertEquals("prop1", d.getPropertyName());
+    assertEquals("oldVal", d.getOldValue());
+    assertEquals("newVal", d.getNewValue());
+  }
+
+  @Test
+  void roundTrip_inviteCommand() {
+    final CommandADT decoded = interpreter.decode(interpreter.encode(
+        new InviteCommandADT("Alice", "player-id-1", "Room A")));
+    assertInstanceOf(InviteCommandADT.class, decoded);
+    final InviteCommandADT d = (InviteCommandADT) decoded;
+    assertEquals("Alice", d.getPlayer());
+    assertEquals("player-id-1", d.getPlayerId());
+    assertEquals("Room A", d.getRoom());
+    assertFalse(d.isLoggable());
+  }
+
+  @Test
+  void roundTrip_privMsgCommand() {
+    final CommandADT decoded = interpreter.decode(interpreter.encode(
+        new PrivMsgCommandADT("Alice", "Hello Bob!")));
+    assertInstanceOf(PrivMsgCommandADT.class, decoded);
+    assertEquals("Alice", ((PrivMsgCommandADT) decoded).getSenderName());
+    assertEquals("Hello Bob!", ((PrivMsgCommandADT) decoded).getMessage());
+    assertFalse(decoded.isLoggable());
+  }
+
+  @Test
+  void roundTrip_synchCommand() {
+    final CommandADT decoded = interpreter.decode(interpreter.encode(
+        new SynchCommandADT("Bob")));
+    assertInstanceOf(SynchCommandADT.class, decoded);
+    assertEquals("Bob", ((SynchCommandADT) decoded).getRecipientName());
+    assertFalse(decoded.isLoggable());
+  }
+
+  @Test
+  void roundTrip_soundEncoderCmd() {
+    final CommandADT decoded = interpreter.decode(interpreter.encode(
+        new SoundEncoderCmdADT("wakeup.wav")));
+    assertInstanceOf(SoundEncoderCmdADT.class, decoded);
+    assertEquals("wakeup.wav", ((SoundEncoderCmdADT) decoded).getSoundKey());
+    assertFalse(decoded.isLoggable());
+  }
+
+  @Test
+  void roundTrip_textClientShowText() {
+    final CommandADT decoded = interpreter.decode(interpreter.encode(
+        new TextClientShowTextADT("Hello stdout!")));
+    assertInstanceOf(TextClientShowTextADT.class, decoded);
+    assertEquals("Hello stdout!", ((TextClientShowTextADT) decoded).getMessage());
   }
 }

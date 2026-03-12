@@ -57,21 +57,10 @@ public class CommandInterpreter {
   /**
    * Creates a new interpreter pre-registered with codecs for all built-in
    * command types corresponding to the direct {@link VASSAL.command.Command}
-   * subclasses in the VASSAL engine:
-   * <ul>
-   *   <li>{@link NullCommandADT} via {@link NullCommandCodec}</li>
-   *   <li>{@link ChangePieceCommandADT} via {@link ChangePieceCommandCodec}</li>
-   *   <li>{@link MovePieceCommandADT} via {@link MovePieceCommandCodec}</li>
-   *   <li>{@link AddPieceCommandADT} via {@link AddPieceCommandCodec}</li>
-   *   <li>{@link RemovePieceCommandADT} via {@link RemovePieceCommandCodec}</li>
-   *   <li>{@link AlertCommandADT} via {@link AlertCommandCodec}</li>
-   *   <li>{@link PlayAudioClipCommandADT} via {@link PlayAudioClipCommandCodec}</li>
-   *   <li>{@link SetPersistentPropertyCommandADT} via {@link SetPersistentPropertyCommandCodec}</li>
-   *   <li>{@link FlareCommandADT} via {@link FlareCommandCodec}</li>
-   *   <li>{@link ConditionalCommandADT} via {@link ConditionalCommandCodec}</li>
-   * </ul>
+   * subclasses in the VASSAL engine.
    */
   public CommandInterpreter() {
+    // --- VASSAL.command ---
     registerCodec(NullCommandADT.COMMAND_TYPE, new NullCommandCodec());
     registerCodec(ChangePieceCommandADT.COMMAND_TYPE, new ChangePieceCommandCodec());
     registerCodec(MovePieceCommandADT.COMMAND_TYPE, new MovePieceCommandCodec());
@@ -82,6 +71,38 @@ public class CommandInterpreter {
     registerCodec(SetPersistentPropertyCommandADT.COMMAND_TYPE, new SetPersistentPropertyCommandCodec());
     registerCodec(FlareCommandADT.COMMAND_TYPE, new FlareCommandCodec());
     registerCodec(ConditionalCommandADT.COMMAND_TYPE, new ConditionalCommandCodec(this));
+    // --- VASSAL.build.module / GameState ---
+    registerCodec(SetupCommandADT.COMMAND_TYPE, new SetupCommandCodec());
+    registerCodec(BasicLoggerUndoCommandADT.COMMAND_TYPE, new BasicLoggerUndoCommandCodec());
+    registerCodec(BasicLoggerLogCommandADT.COMMAND_TYPE, new BasicLoggerLogCommandCodec(this));
+    registerCodec(ModuleExtensionRegCmdADT.COMMAND_TYPE, new ModuleExtensionRegCmdCodec());
+    registerCodec(ObscurableOptionsSetAllowedADT.COMMAND_TYPE, new ObscurableOptionsSetAllowedCodec());
+    registerCodec(NewGameIndicatorMarkGameNotNewADT.COMMAND_TYPE, new NewGameIndicatorMarkGameNotNewCodec());
+    registerCodec(ChatterDisplayTextADT.COMMAND_TYPE, new ChatterDisplayTextCodec());
+    registerCodec(NotesWindowSetScenarioNoteADT.COMMAND_TYPE, new NotesWindowSetScenarioNoteCodec());
+    registerCodec(NotesWindowSetPublicNoteADT.COMMAND_TYPE, new NotesWindowSetPublicNoteCodec());
+    registerCodec(PlayerRosterAddADT.COMMAND_TYPE, new PlayerRosterAddCodec());
+    registerCodec(PlayerRosterRemoveADT.COMMAND_TYPE, new PlayerRosterRemoveCodec());
+    registerCodec(EventLogStoreEventsADT.COMMAND_TYPE, new EventLogStoreEventsCodec());
+    // --- Component-identified ---
+    registerCodec(TurnTrackerSetTurnADT.COMMAND_TYPE, new TurnTrackerSetTurnCodec());
+    registerCodec(GlobalPropertySetGlobalPropertyADT.COMMAND_TYPE, new GlobalPropertySetGlobalPropertyCodec());
+    registerCodec(LOSThreadLOSCommandADT.COMMAND_TYPE, new LOSThreadLOSCommandCodec());
+    registerCodec(SpecialDiceButtonShowResultsADT.COMMAND_TYPE, new SpecialDiceButtonShowResultsCodec());
+    registerCodec(BoardPickerSetBoardsADT.COMMAND_TYPE, new BoardPickerSetBoardsCodec());
+    registerCodec(DeckLoadDeckCommandADT.COMMAND_TYPE, new DeckLoadDeckCommandCodec());
+    registerCodec(LockScenarioOptionsTabADT.COMMAND_TYPE, new LockScenarioOptionsTabCodec());
+    // --- Notes / Secret ---
+    registerCodec(AddSecretNoteCommandADT.COMMAND_TYPE, new AddSecretNoteCommandCodec());
+    registerCodec(SetPrivateTextCommandADT.COMMAND_TYPE, new SetPrivateTextCommandCodec());
+    registerCodec(ChangePropertyCommandADT.COMMAND_TYPE, new ChangePropertyCommandCodec());
+    // --- Chat (not loggable) ---
+    registerCodec(InviteCommandADT.COMMAND_TYPE, new InviteCommandCodec());
+    registerCodec(PrivMsgCommandADT.COMMAND_TYPE, new PrivMsgCommandCodec());
+    registerCodec(SynchCommandADT.COMMAND_TYPE, new SynchCommandCodec());
+    registerCodec(SoundEncoderCmdADT.COMMAND_TYPE, new SoundEncoderCmdCodec());
+    // --- TextClient ---
+    registerCodec(TextClientShowTextADT.COMMAND_TYPE, new TextClientShowTextCodec());
   }
 
   // -----------------------------------------------------------------------
