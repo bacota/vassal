@@ -121,18 +121,25 @@ class CompoundCommandADTTest {
     final List<String> undoLog = new ArrayList<>();
     final CompoundCommandADT compound = new CompoundCommandADT();
 
-    compound.append(recordingCommand("A", new ArrayList<>()) {
+    final AbstractCommandADT cmdA = new AbstractCommandADT() {
+      @Override public String getCommandType() { return "FAKE"; }
+      @Override protected void executeInternal() {}
       @Override
       protected CommandADT createUndoCommand() {
         return recordingCommand("undo-A", undoLog);
       }
-    });
-    compound.append(recordingCommand("B", new ArrayList<>()) {
+    };
+    final AbstractCommandADT cmdB = new AbstractCommandADT() {
+      @Override public String getCommandType() { return "FAKE"; }
+      @Override protected void executeInternal() {}
       @Override
       protected CommandADT createUndoCommand() {
         return recordingCommand("undo-B", undoLog);
       }
-    });
+    };
+
+    compound.append(cmdA);
+    compound.append(cmdB);
 
     compound.getUndoCommand().execute();
 

@@ -20,8 +20,11 @@ package VASSAL.command.adt;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.awt.Point;
 import java.util.ArrayList;
 import java.util.List;
+
+import VASSAL.command.ConditionalCommand;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -257,5 +260,200 @@ class CommandInterpreterTest {
   @Test
   void execute_nullCommand_throwsIAE() {
     assertThrows(IllegalArgumentException.class, () -> interpreter.execute(null));
+  }
+
+  // -----------------------------------------------------------------------
+  // Round-trip tests for built-in command types
+  // -----------------------------------------------------------------------
+
+  @Test
+  void roundTrip_changePiece() {
+    final ChangePieceCommandADT cmd = new ChangePieceCommandADT("piece-1", "old", "new");
+    final String encoded = interpreter.encode(cmd);
+    assertTrue(encoded.startsWith(ChangePieceCommandADT.COMMAND_TYPE + ":"));
+    final CommandADT decoded = interpreter.decode(encoded);
+    assertInstanceOf(ChangePieceCommandADT.class, decoded);
+    final ChangePieceCommandADT d = (ChangePieceCommandADT) decoded;
+    assertEquals("piece-1", d.getId());
+    assertEquals("old", d.getOldState());
+    assertEquals("new", d.getNewState());
+  }
+
+  @Test
+  void roundTrip_changePiece_nullOldState() {
+    final ChangePieceCommandADT cmd = new ChangePieceCommandADT("piece-2", null, "new");
+    final CommandADT decoded = interpreter.decode(interpreter.encode(cmd));
+    assertInstanceOf(ChangePieceCommandADT.class, decoded);
+    assertNull(((ChangePieceCommandADT) decoded).getOldState());
+  }
+
+  @Test
+  void roundTrip_movePiece() {
+    final MovePieceCommandADT cmd = new MovePieceCommandADT(
+        "p1", "map-a", new Point(10, 20), "under-1",
+        "map-b", new Point(5, 15), null, "player-x");
+    final CommandADT decoded = interpreter.decode(interpreter.encode(cmd));
+    assertInstanceOf(MovePieceCommandADT.class, decoded);
+    final MovePieceCommandADT d = (MovePieceCommandADT) decoded;
+    assertEquals("p1", d.getId());
+    assertEquals("map-a", d.getNewMapId());
+    assertEquals(10, d.getNewPosition().x);
+    assertEquals(20, d.getNewPosition().y);
+    assertEquals("under-1", d.getNewUnderneathId());
+    assertEquals("map-b", d.getOldMapId());
+    assertEquals(5, d.getOldPosition().x);
+    assertEquals(15, d.getOldPosition().y);
+    assertNull(d.getOldUnderneathId());
+    assertEquals("player-x", d.getPlayerId());
+  }
+
+  @Test
+  void roundTrip_addPiece() {
+    final AddPieceCommandADT cmd = new AddPieceCommandADT("pid", "BasicPiece;;", "state-data");
+    final CommandADT decoded = interpreter.decode(interpreter.encode(cmd));
+    assertInstanceOf(AddPieceCommandADT.class, decoded);
+    final AddPieceCommandADT d = (AddPieceCommandADT) decoded;
+    assertEquals("pid", d.getPieceId());
+    assertEquals("BasicPiece;;", d.getPieceType());
+    assertEquals("state-data", d.getState());
+  }
+
+  @Test
+  void roundTrip_removePiece() {
+    final RemovePieceCommandADT cmd = new RemovePieceCommandADT("rid");
+    final CommandADT decoded = interpreter.decode(interpreter.encode(cmd));
+    assertInstanceOf(RemovePieceCommandADT.class, decoded);
+    assertEquals("rid", ((RemovePieceCommandADT) decoded).getPieceId());
+  }
+
+  @Test
+  void roundTrip_alert() {
+    final AlertCommandADT cmd = new AlertCommandADT("Hello world!");
+    final CommandADT decoded = interpreter.decode(interpreter.encode(cmd));
+    assertInstanceOf(AlertCommandADT.class, decoded);
+    assertEquals("Hello world!", ((AlertCommandADT) decoded).getMessage());
+  }
+
+  @Test
+  void roundTrip_playAudioClip() {
+    final PlayAudioClipCommandADT cmd = new PlayAudioClipCommandADT("fanfare.wav");
+    final CommandADT decoded = interpreter.decode(interpreter.encode(cmd));
+    assertInstanceOf(PlayAudioClipCommandADT.class, decoded);
+    assertEquals("fanfare.wav", ((PlayAudioClipCommandADT) decoded).getClipName());
+  }
+
+  @Test
+  void roundTrip_setPersistentProperty() {
+    final SetPersistentPropertyCommandADT cmd =
+        new SetPersistentPropertyCommandADT("pid", "myKey", "oldVal", "newVal");
+    final CommandADT decoded = interpreter.decode(interpreter.encode(cmd));
+    assertInstanceOf(SetPersistentPropertyCommandADT.class, decoded);
+    final SetPersistentPropertyCommandADT d = (SetPersistentPropertyCommandADT) decoded;
+    assertEquals("pid", d.getId());
+    assertEquals("myKey", d.getKey());
+    assertEquals("oldVal", d.getOldValue());
+    assertEquals("newVal", d.getNewValue());
+  }
+
+  @Test
+  void roundTrip_flare() {
+    final FlareCommandADT cmd = new FlareCommandADT("Flare0", 100, 200);
+    final CommandADT decoded = interpreter.decode(interpreter.encode(cmd));
+    assertInstanceOf(FlareCommandADT.class, decoded);
+    final FlareCommandADT d = (FlareCommandADT) decoded;
+    assertEquals("Flare0", d.getFlareId());
+    assertEquals(100, d.getClickX());
+    assertEquals(200, d.getClickY());
+  }
+
+  @Test
+  void roundTrip_conditional_withLtCondition() {
+    final ConditionalCommand.Condition cond =
+        new ConditionalCommand.Lt("vassal.version", "3.7.0");
+    final ConditionalCommandADT cmd = new ConditionalCommandADT(
+        new ConditionalCommand.Condition[]{cond},
+        new AlertCommandADT("outdated version"));
+    final CommandADT decoded = interpreter.decode(interpreter.encode(cmd));
+    assertInstanceOf(ConditionalCommandADT.class, decoded);
+    final ConditionalCommandADT d = (ConditionalCommandADT) decoded;
+    assertEquals(1, d.getConditions().length);
+    assertInstanceOf(ConditionalCommand.Lt.class, d.getConditions()[0]);
+    assertInstanceOf(AlertCommandADT.class, d.getDelegate());
+    assertEquals("outdated version", ((AlertCommandADT) d.getDelegate()).getMessage());
+  }
+
+  @Test
+  void roundTrip_conditional_withEqCondition() {
+    final ConditionalCommand.Condition cond =
+        new ConditionalCommand.Eq("moduleVersion", List.of("1.0", "1.1"));
+    final ConditionalCommandADT cmd = new ConditionalCommandADT(
+        new ConditionalCommand.Condition[]{cond},
+        new NullCommandADT());
+    final CommandADT decoded = interpreter.decode(interpreter.encode(cmd));
+    assertInstanceOf(ConditionalCommandADT.class, decoded);
+    final ConditionalCommandADT d = (ConditionalCommandADT) decoded;
+    assertInstanceOf(ConditionalCommand.Eq.class, d.getConditions()[0]);
+    final ConditionalCommand.Eq eq =
+        (ConditionalCommand.Eq) d.getConditions()[0];
+    assertEquals("moduleVersion", eq.getProperty());
+    assertEquals(List.of("1.0", "1.1"), eq.getValueList());
+  }
+
+  @Test
+  void roundTrip_conditional_withNotCondition() {
+    final ConditionalCommand.Condition inner =
+        new ConditionalCommand.Gt("vassal.version", "3.0.0");
+    final ConditionalCommand.Condition cond =
+        new ConditionalCommand.Not(inner);
+    final ConditionalCommandADT cmd = new ConditionalCommandADT(
+        new ConditionalCommand.Condition[]{cond},
+        new AlertCommandADT("too old"));
+    final CommandADT decoded = interpreter.decode(interpreter.encode(cmd));
+    assertInstanceOf(ConditionalCommandADT.class, decoded);
+    assertInstanceOf(ConditionalCommand.Not.class,
+        ((ConditionalCommandADT) decoded).getConditions()[0]);
+  }
+
+  @Test
+  void roundTrip_changePiece_withTabInState() {
+    // Verify that tab characters inside a payload are properly escaped
+    final ChangePieceCommandADT cmd =
+        new ChangePieceCommandADT("p", "old\twith\ttabs", "new\tstate");
+    final String encoded = interpreter.encode(cmd);
+    final CommandADT decoded = interpreter.decode(encoded);
+    assertInstanceOf(ChangePieceCommandADT.class, decoded);
+    assertEquals("old\twith\ttabs", ((ChangePieceCommandADT) decoded).getOldState());
+    assertEquals("new\tstate", ((ChangePieceCommandADT) decoded).getNewState());
+  }
+
+  @Test
+  void roundTrip_compoundWithNewCommandTypes() {
+    final ChangePieceCommandADT parent = new ChangePieceCommandADT("p", "s0", "s1");
+    parent.append(new AlertCommandADT("sub-alert"));
+    final CommandADT decoded = interpreter.decode(interpreter.encode(parent));
+    assertInstanceOf(ChangePieceCommandADT.class, decoded);
+    assertEquals(1, decoded.getSubCommands().length);
+    assertInstanceOf(AlertCommandADT.class, decoded.getSubCommands()[0]);
+    assertEquals("sub-alert", ((AlertCommandADT) decoded.getSubCommands()[0]).getMessage());
+  }
+
+  @Test
+  void allBuiltinCommandTypes_areRegisteredByDefault() {
+    final CommandInterpreter interp = new CommandInterpreter();
+    // All built-in types should encode without throwing IAE
+    assertDoesNotThrow(() -> interp.encode(new NullCommandADT()));
+    assertDoesNotThrow(() -> interp.encode(new ChangePieceCommandADT("id", "old", "new")));
+    assertDoesNotThrow(() -> interp.encode(
+        new MovePieceCommandADT("id", "m", new Point(0,0), null,
+            "m", new Point(0,0), null, null)));
+    assertDoesNotThrow(() -> interp.encode(new AddPieceCommandADT("id", "type", "state")));
+    assertDoesNotThrow(() -> interp.encode(new RemovePieceCommandADT("id")));
+    assertDoesNotThrow(() -> interp.encode(new AlertCommandADT("msg")));
+    assertDoesNotThrow(() -> interp.encode(new PlayAudioClipCommandADT("clip")));
+    assertDoesNotThrow(() -> interp.encode(
+        new SetPersistentPropertyCommandADT("id", "k", "old", "new")));
+    assertDoesNotThrow(() -> interp.encode(new FlareCommandADT("f0", 0, 0)));
+    assertDoesNotThrow(() -> interp.encode(new ConditionalCommandADT(
+        new ConditionalCommand.Condition[0], new NullCommandADT())));
   }
 }

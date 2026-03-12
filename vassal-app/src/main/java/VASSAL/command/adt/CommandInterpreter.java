@@ -20,6 +20,8 @@ package VASSAL.command.adt;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import VASSAL.tools.SequenceEncoder;
+
 /**
  * Interpreter for {@link CommandADT} instances that manages encoding,
  * decoding, and execution.
@@ -47,13 +49,39 @@ public class CommandInterpreter {
   /** Delimiter used to separate sub-commands in a compound encoding. */
   static final String COMPOUND_SEPARATOR = "\t";
 
+  /** Character form of {@link #COMPOUND_SEPARATOR} used with {@link SequenceEncoder}. */
+  static final char COMPOUND_SEP_CHAR = '\t';
+
   private final Map<String, CommandCodec> codecs = new LinkedHashMap<>();
 
   /**
-   * Creates a new interpreter pre-registered with a {@link NullCommandCodec}.
+   * Creates a new interpreter pre-registered with codecs for all built-in
+   * command types corresponding to the direct {@link VASSAL.command.Command}
+   * subclasses in the VASSAL engine:
+   * <ul>
+   *   <li>{@link NullCommandADT} via {@link NullCommandCodec}</li>
+   *   <li>{@link ChangePieceCommandADT} via {@link ChangePieceCommandCodec}</li>
+   *   <li>{@link MovePieceCommandADT} via {@link MovePieceCommandCodec}</li>
+   *   <li>{@link AddPieceCommandADT} via {@link AddPieceCommandCodec}</li>
+   *   <li>{@link RemovePieceCommandADT} via {@link RemovePieceCommandCodec}</li>
+   *   <li>{@link AlertCommandADT} via {@link AlertCommandCodec}</li>
+   *   <li>{@link PlayAudioClipCommandADT} via {@link PlayAudioClipCommandCodec}</li>
+   *   <li>{@link SetPersistentPropertyCommandADT} via {@link SetPersistentPropertyCommandCodec}</li>
+   *   <li>{@link FlareCommandADT} via {@link FlareCommandCodec}</li>
+   *   <li>{@link ConditionalCommandADT} via {@link ConditionalCommandCodec}</li>
+   * </ul>
    */
   public CommandInterpreter() {
     registerCodec(NullCommandADT.COMMAND_TYPE, new NullCommandCodec());
+    registerCodec(ChangePieceCommandADT.COMMAND_TYPE, new ChangePieceCommandCodec());
+    registerCodec(MovePieceCommandADT.COMMAND_TYPE, new MovePieceCommandCodec());
+    registerCodec(AddPieceCommandADT.COMMAND_TYPE, new AddPieceCommandCodec());
+    registerCodec(RemovePieceCommandADT.COMMAND_TYPE, new RemovePieceCommandCodec());
+    registerCodec(AlertCommandADT.COMMAND_TYPE, new AlertCommandCodec());
+    registerCodec(PlayAudioClipCommandADT.COMMAND_TYPE, new PlayAudioClipCommandCodec());
+    registerCodec(SetPersistentPropertyCommandADT.COMMAND_TYPE, new SetPersistentPropertyCommandCodec());
+    registerCodec(FlareCommandADT.COMMAND_TYPE, new FlareCommandCodec());
+    registerCodec(ConditionalCommandADT.COMMAND_TYPE, new ConditionalCommandCodec(this));
   }
 
   // -----------------------------------------------------------------------
@@ -98,10 +126,10 @@ public class CommandInterpreter {
   /**
    * Encodes {@code command} into a String.
    *
-   * <p>If the command has sub-commands, a compound encoding is produced:
-   * the command itself and each sub-command are encoded individually and
-   * joined with {@value #COMPOUND_SEPARATOR}, prefixed by
-   * {@code COMPOUND:}.
+   * <p>If the command has sub-commands, a compound encoding is produced using
+   * {@link SequenceEncoder} with a tab delimiter so that any tab characters
+   * inside individual payloads are properly escaped:
+   * {@code COMPOUND:<first>\t<sub1>\t<sub2>...}.
    *
    * @param command the command to encode; must not be {@code null}
    * @return the encoded string
@@ -114,14 +142,12 @@ public class CommandInterpreter {
 
     final CommandADT[] subCommands = command.getSubCommands();
     if (subCommands.length > 0) {
-      // Compound: encode this command + each sub-command
-      final StringBuilder sb = new StringBuilder();
-      sb.append(CompoundCommandADT.COMMAND_TYPE).append(TYPE_SEPARATOR);
-      sb.append(encodeSingle(command));
+      // Use SequenceEncoder so \t inside payloads is properly escaped
+      final SequenceEncoder se = new SequenceEncoder(encodeSingle(command), COMPOUND_SEP_CHAR);
       for (final CommandADT sub : subCommands) {
-        sb.append(COMPOUND_SEPARATOR).append(encode(sub));
+        se.append(encode(sub));
       }
-      return sb.toString();
+      return CompoundCommandADT.COMMAND_TYPE + TYPE_SEPARATOR + se.getValue();
     }
 
     return encodeSingle(command);
@@ -151,9 +177,9 @@ public class CommandInterpreter {
   /**
    * Decodes an encoded string back into a {@link CommandADT}.
    *
-   * <p>If the string starts with {@code COMPOUND:}, each tab-delimited
-   * token after the prefix is decoded recursively and appended as a
-   * sub-command to the first decoded command.
+   * <p>If the string starts with {@code COMPOUND:}, the body is parsed with
+   * {@link SequenceEncoder.Decoder} (which handles escape sequences) and each
+   * token is decoded recursively.
    *
    * @param encoded the encoded string; must not be {@code null}
    * @return the decoded command
@@ -174,21 +200,21 @@ public class CommandInterpreter {
 
   /**
    * Decodes a compound-encoded string.
-   * Format: {@code COMPOUND:<first>\t<sub1>\t<sub2>...}
+   * Format: {@code COMPOUND:<SequenceEncoder-value-with-tab-separator>}
    */
   private CommandADT decodeCompound(String encoded) {
     // Strip "COMPOUND:" prefix
     final String body = encoded.substring(
         CompoundCommandADT.COMMAND_TYPE.length() + TYPE_SEPARATOR.length());
 
-    final String[] parts = body.split(COMPOUND_SEPARATOR, -1);
-    if (parts.length == 0) {
+    final SequenceEncoder.Decoder st = new SequenceEncoder.Decoder(body, COMPOUND_SEP_CHAR);
+    if (!st.hasMoreTokens()) {
       return new NullCommandADT();
     }
 
-    CommandADT result = decodeSingle(parts[0]);
-    for (int i = 1; i < parts.length; i++) {
-      result = result.append(decode(parts[i]));
+    CommandADT result = decodeSingle(st.nextToken());
+    while (st.hasMoreTokens()) {
+      result = result.append(decode(st.nextToken()));
     }
     return result;
   }
