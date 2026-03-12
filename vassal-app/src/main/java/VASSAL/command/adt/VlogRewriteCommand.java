@@ -126,7 +126,7 @@ public class VlogRewriteCommand {
     System.out.println(summary);
 
     System.out.println("Writing: " + outputFile); //NON-NLS
-    writeVlog(outputFile, commandString);
+    copyVlog(inputFile, outputFile, commandString);
     System.out.println("Done."); //NON-NLS
   }
 
@@ -165,6 +165,11 @@ public class VlogRewriteCommand {
    * Writes a command string to a new {@code .vlog} file, using the standard
    * VASSAL obfuscation so the file can be opened by VASSAL.
    *
+   * <p>This method creates a minimal vlog containing only the {@code savedGame}
+   * entry.  When you are re-writing an existing vlog and want to preserve all
+   * other metadata ({@code savedata}, {@code moduledata}, etc.), use
+   * {@link #copyVlog(File, File, String)} instead.
+   *
    * @param vlogFile      the output {@code .vlog} file to create (or overwrite)
    * @param commandString the raw VASSAL-encoded command string
    * @throws IOException if the file cannot be written
@@ -174,6 +179,53 @@ public class VlogRewriteCommand {
       try (OutputStream out = new ObfuscatingOutputStream(
           new BufferedOutputStream(zw.write(GameState.SAVEFILE_ZIP_ENTRY)))) {
         out.write(commandString.getBytes(StandardCharsets.UTF_8));
+      }
+    }
+  }
+
+  /**
+   * Copies an existing {@code .vlog} file to a new file, replacing only the
+   * {@code savedGame} entry with the provided command string.
+   *
+   * <p>All other ZIP entries ({@code savedata}, {@code moduledata}, and any
+   * other entries present in the source file) are copied verbatim so that the
+   * output vlog is a fully valid VASSAL log file indistinguishable from one
+   * written by the engine.
+   *
+   * @param inputVlog     the source {@code .vlog} file to copy from
+   * @param outputVlog    the destination {@code .vlog} file to create (or overwrite)
+   * @param commandString the raw VASSAL-encoded command string to write into
+   *                      the {@code savedGame} entry
+   * @throws IOException if either file cannot be read or written
+   */
+  public static void copyVlog(File inputVlog, File outputVlog, String commandString) throws IOException {
+    try (ZipInputStream zis = new ZipInputStream(
+             new BufferedInputStream(Files.newInputStream(inputVlog.toPath())));
+         ZipWriter zw = new ZipWriter(outputVlog)) {
+
+      boolean savedGameWritten = false;
+
+      for (ZipEntry entry = zis.getNextEntry(); entry != null; entry = zis.getNextEntry()) {
+        if (GameState.SAVEFILE_ZIP_ENTRY.equals(entry.getName())) {
+          // Replace with the (possibly modified) command string
+          try (OutputStream out = new ObfuscatingOutputStream(
+              new BufferedOutputStream(zw.write(GameState.SAVEFILE_ZIP_ENTRY)))) {
+            out.write(commandString.getBytes(StandardCharsets.UTF_8));
+          }
+          savedGameWritten = true;
+        }
+        else {
+          // Stream every other entry (savedata, moduledata, …) verbatim
+          zw.write(zis, entry.getName());
+        }
+      }
+
+      if (!savedGameWritten) {
+        // Input had no savedGame entry; write it anyway so the output is valid
+        try (OutputStream out = new ObfuscatingOutputStream(
+            new BufferedOutputStream(zw.write(GameState.SAVEFILE_ZIP_ENTRY)))) {
+          out.write(commandString.getBytes(StandardCharsets.UTF_8));
+        }
       }
     }
   }

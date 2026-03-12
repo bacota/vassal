@@ -171,4 +171,81 @@ class VlogRewriteCommandTest {
     }
     assertThrows(IOException.class, () -> VlogRewriteCommand.readVlog(bad));
   }
+
+  // -----------------------------------------------------------------------
+  // copyVlog — metadata preservation
+  // -----------------------------------------------------------------------
+
+  @Test
+  void copyVlog_preservesExtraEntries(@TempDir File tmp) throws IOException {
+    final String commandString = "SETUP\ttrue\u001BLOG\tsome data";
+    final byte[] savedataBytes = "<savedata><version>1</version></savedata>".getBytes(StandardCharsets.UTF_8);
+    final byte[] moduledataBytes = "<moduledata><name>Test</name></moduledata>".getBytes(StandardCharsets.UTF_8);
+
+    // Build a source vlog with savedGame + savedata + moduledata
+    final File src = new File(tmp, "src.vlog");
+    try (java.util.zip.ZipOutputStream zos =
+             new java.util.zip.ZipOutputStream(Files.newOutputStream(src.toPath()))) {
+      // savedGame (obfuscated)
+      zos.putNextEntry(new java.util.zip.ZipEntry(VASSAL.build.module.GameState.SAVEFILE_ZIP_ENTRY));
+      // Write raw obfuscated bytes using ObfuscatingOutputStream
+      final java.io.ByteArrayOutputStream obfBuf = new java.io.ByteArrayOutputStream();
+      try (VASSAL.tools.io.ObfuscatingOutputStream oos = new VASSAL.tools.io.ObfuscatingOutputStream(obfBuf)) {
+        oos.write(commandString.getBytes(StandardCharsets.UTF_8));
+      }
+      zos.write(obfBuf.toByteArray());
+
+      // savedata (plain)
+      zos.putNextEntry(new java.util.zip.ZipEntry("savedata"));
+      zos.write(savedataBytes);
+
+      // moduledata (plain)
+      zos.putNextEntry(new java.util.zip.ZipEntry("moduledata"));
+      zos.write(moduledataBytes);
+    }
+
+    // Copy it
+    final File dst = new File(tmp, "dst.vlog");
+    VlogRewriteCommand.copyVlog(src, dst, commandString);
+
+    // Verify: savedGame round-trips correctly
+    assertEquals(commandString, VlogRewriteCommand.readVlog(dst));
+
+    // Verify: savedata and moduledata are preserved verbatim
+    final java.util.Map<String, byte[]> entries = readAllEntries(dst);
+    assertTrue(entries.containsKey("savedata"), "savedata should be preserved");
+    assertTrue(entries.containsKey("moduledata"), "moduledata should be preserved");
+    assertArrayEquals(savedataBytes, entries.get("savedata"));
+    assertArrayEquals(moduledataBytes, entries.get("moduledata"));
+  }
+
+  @Test
+  void copyVlog_replacesCommandString(@TempDir File tmp) throws IOException {
+    final String original = "SETUP\ttrue\u001BLOG\toriginal";
+    final String replacement = "SETUP\ttrue\u001BLOG\treplaced";
+
+    final File src = new File(tmp, "src.vlog");
+    VlogRewriteCommand.writeVlog(src, original);
+
+    final File dst = new File(tmp, "dst.vlog");
+    VlogRewriteCommand.copyVlog(src, dst, replacement);
+
+    assertEquals(replacement, VlogRewriteCommand.readVlog(dst));
+  }
+
+  /** Helper: reads all raw (non-deobfuscated) bytes for each ZIP entry. */
+  private static java.util.Map<String, byte[]> readAllEntries(File zipFile) throws IOException {
+    final java.util.Map<String, byte[]> result = new java.util.LinkedHashMap<>();
+    try (java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(
+             Files.newInputStream(zipFile.toPath()))) {
+      for (java.util.zip.ZipEntry e = zis.getNextEntry(); e != null; e = zis.getNextEntry()) {
+        final java.io.ByteArrayOutputStream buf = new java.io.ByteArrayOutputStream();
+        final byte[] buffer = new byte[4096];
+        int n;
+        while ((n = zis.read(buffer)) != -1) buf.write(buffer, 0, n);
+        result.put(e.getName(), buf.toByteArray());
+      }
+    }
+    return result;
+  }
 }
