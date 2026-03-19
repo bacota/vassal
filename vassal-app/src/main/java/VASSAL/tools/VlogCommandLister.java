@@ -20,10 +20,15 @@ package VASSAL.tools;
 import VASSAL.command.ChangePiece;
 import VASSAL.command.MovePiece;
 import VASSAL.tools.io.DeobfuscatingInputStream;
+import VASSAL.tools.io.ObfuscatingOutputStream;
+import VASSAL.tools.io.ZipWriter;
 
 import java.awt.Point;
+import java.io.BufferedOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -36,13 +41,19 @@ import java.util.zip.ZipInputStream;
  * Standalone command-line tool that reads a VASSAL {@code .vlog} file and
  * prints the decoded {@link VASSAL.command.Command#toString()} of each top-level
  * command contained in it, followed by a summary count of commands by type.
+ * It can also recreate a {@code .vlog} file from a previously extracted token stream.
  *
- * <p>Usage: {@code java VASSAL.tools.VlogCommandLister <file.vlog>}</p>
+ * <p>List commands in a vlog:</p>
+ * <pre>  java VASSAL.tools.VlogCommandLister &lt;file.vlog&gt;</pre>
+ *
+ * <p>Recreate a vlog from its tokens (round-trip):</p>
+ * <pre>  java VASSAL.tools.VlogCommandLister &lt;file.vlog&gt; --recreate &lt;output.vlog&gt;</pre>
  *
  * <p>This tool does NOT require a running {@code GameModule} or any GUI
- * components.  It only uses {@link DeobfuscatingInputStream} from the VASSAL
- * low-level I/O layer, {@link VASSAL.command.ChangePiece}/{@link MovePiece}
- * (which are decodable without a module), and the standard Java library.</p>
+ * components.  It only uses {@link DeobfuscatingInputStream}/
+ * {@link ObfuscatingOutputStream} from the VASSAL low-level I/O layer,
+ * {@link VASSAL.command.ChangePiece}/{@link MovePiece} (which are decodable
+ * without a module), and the standard Java library.</p>
  */
 public class VlogCommandLister {
 
@@ -76,8 +87,8 @@ public class VlogCommandLister {
   private static final int PREVIEW_LEN = 40;
 
   public static void main(String[] args) throws IOException {
-    if (args.length != 1) {
-      System.err.println("Usage: VlogCommandLister <file.vlog>"); //$NON-NLS-1$
+    if (args.length != 1 && args.length != 3) {
+      System.err.println("Usage: VlogCommandLister <file.vlog> [--recreate <output.vlog>]"); //$NON-NLS-1$
       System.exit(1);
     }
 
@@ -120,6 +131,42 @@ public class VlogCommandLister {
     System.out.println("=== Command summary ==="); //$NON-NLS-1$
     counts.forEach((type, count) ->
       System.out.printf("  %-40s %d%n", type, count)); //$NON-NLS-1$
+
+    // Optionally recreate the vlog from the extracted tokens.
+    if (args.length == 3 && "--recreate".equals(args[1])) { //$NON-NLS-1$
+      final String outputPath = args[2];
+      recreateVlog(tokens, new File(outputPath));
+      System.out.println("Recreated vlog written to: " + outputPath); //$NON-NLS-1$
+    }
+  }
+
+  /**
+   * Recreates a {@code .vlog} file from an array of command tokens.
+   *
+   * <p>The tokens are joined with {@link #COMMAND_SEPARATOR}, then written
+   * through {@link ObfuscatingOutputStream} into the {@code savedGame} entry
+   * of a new ZIP file, exactly mirroring how {@code BasicLogger.write()} and
+   * {@code GameState.saveGame()} produce vlog/vsav files.</p>
+   *
+   * <p>Only the {@code savedGame} ZIP entry is written; optional metadata
+   * entries (e.g. {@code moduleData}) that a full VASSAL save would include
+   * are not reproduced because they are not available without a running
+   * {@code GameModule}.</p>
+   *
+   * @param tokens the command tokens to write; each element must not contain
+   *               the {@link #COMMAND_SEPARATOR} character
+   * @param outputFile destination file; created or overwritten as necessary
+   * @throws IOException if writing the file fails
+   */
+  public static void recreateVlog(final String[] tokens, final File outputFile)
+                                                             throws IOException {
+    final String content = String.join(String.valueOf(COMMAND_SEPARATOR), tokens);
+    try (ZipWriter zw = new ZipWriter(outputFile)) {
+      try (OutputStream out = new ObfuscatingOutputStream(
+               new BufferedOutputStream(zw.write(SAVEFILE_ZIP_ENTRY)))) {
+        out.write(content.getBytes(StandardCharsets.UTF_8));
+      }
+    }
   }
 
   /**
