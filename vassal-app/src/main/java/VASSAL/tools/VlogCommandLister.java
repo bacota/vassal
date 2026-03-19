@@ -17,8 +17,13 @@
  */
 package VASSAL.tools;
 
+import VASSAL.build.module.BasicCommandEncoder;
+import VASSAL.build.module.BasicLogger;
+import VASSAL.build.module.GameState;
 import VASSAL.command.ChangePiece;
+import VASSAL.command.Command;
 import VASSAL.command.MovePiece;
+import VASSAL.command.NullCommand;
 import VASSAL.tools.io.DeobfuscatingInputStream;
 import VASSAL.tools.io.ObfuscatingOutputStream;
 import VASSAL.tools.io.ZipWriter;
@@ -32,7 +37,9 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -48,6 +55,10 @@ import java.util.zip.ZipInputStream;
  *
  * <p>Recreate a vlog from its tokens (round-trip):</p>
  * <pre>  java VASSAL.tools.VlogCommandLister &lt;file.vlog&gt; --recreate &lt;output.vlog&gt;</pre>
+ *
+ * <p>The {@link #createVlog(List, File)} method can be used programmatically to
+ * write a new {@code .vlog} file from a list of {@link Command} objects without
+ * a running {@code GameModule}.</p>
  *
  * <p>This tool does NOT require a running {@code GameModule} or any GUI
  * components.  It only uses {@link DeobfuscatingInputStream}/
@@ -167,6 +178,80 @@ public class VlogCommandLister {
         out.write(content.getBytes(StandardCharsets.UTF_8));
       }
     }
+  }
+
+  /**
+   * Creates a {@code .vlog} file from a list of {@link Command} objects.
+   *
+   * <p>Each command is encoded to its token string using {@link BasicCommandEncoder}
+   * for piece-level commands ({@link VASSAL.command.AddPiece},
+   * {@link VASSAL.command.RemovePiece}, {@link ChangePiece},
+   * {@link MovePiece}, {@link NullCommand},
+   * {@link VASSAL.command.PlayAudioClipCommand}) and direct string construction
+   * for higher-level commands ({@link GameState.SetupCommand},
+   * {@link BasicLogger.LogCommand}, {@link BasicLogger.UndoCommand}).
+   * {@code LogCommand} arguments are encoded recursively.</p>
+   *
+   * <p>This method does not require a running {@code GameModule}.</p>
+   *
+   * @param commands the commands to encode; must only contain command types
+   *                 handled by {@link #encodeCommand(Command)}
+   * @param outputFile destination file; created or overwritten as necessary
+   * @throws IOException if writing the file fails
+   * @throws IllegalArgumentException if a command cannot be encoded without
+   *                                  a running {@code GameModule}
+   */
+  public static void createVlog(final List<Command> commands, final File outputFile)
+                                                                   throws IOException {
+    final BasicCommandEncoder encoder = new BasicCommandEncoder();
+    final List<String> tokens = new ArrayList<>(commands.size());
+    for (final Command c : commands) {
+      tokens.add(encodeCommand(c, encoder));
+    }
+    recreateVlog(tokens.toArray(new String[0]), outputFile);
+  }
+
+  /**
+   * Encodes a single {@link Command} object into its serialised token string
+   * without requiring a running {@code GameModule}.
+   *
+   * <p>Handles: {@link NullCommand}, {@link GameState.SetupCommand},
+   * {@link BasicLogger.LogCommand} (recursively),
+   * {@link BasicLogger.UndoCommand}, and all types supported by
+   * {@link BasicCommandEncoder} ({@link VASSAL.command.AddPiece},
+   * {@link VASSAL.command.RemovePiece}, {@link ChangePiece},
+   * {@link MovePiece}, {@link VASSAL.command.PlayAudioClipCommand}).</p>
+   *
+   * @param c the command to encode; must not be {@code null}
+   * @return the serialized token string (never {@code null})
+   * @throws IllegalArgumentException if the command type is not supported
+   */
+  static String encodeCommand(final Command c) {
+    return encodeCommand(c, new BasicCommandEncoder());
+  }
+
+  private static String encodeCommand(final Command c,
+                                      final BasicCommandEncoder encoder) {
+    if (c instanceof NullCommand) {
+      return ""; //$NON-NLS-1$
+    }
+    if (c instanceof GameState.SetupCommand) {
+      return ((GameState.SetupCommand) c).isGameStarting() ? END_SAVE : BEGIN_SAVE;
+    }
+    if (c instanceof BasicLogger.LogCommand) {
+      return LOG + encodeCommand(((BasicLogger.LogCommand) c).getLoggedCommand(), encoder);
+    }
+    if (c instanceof BasicLogger.UndoCommand) {
+      return UNDO + ((BasicLogger.UndoCommand) c).isInProgress();
+    }
+    // Delegate AddPiece / RemovePiece / ChangePiece / MovePiece / PlayAudioClipCommand
+    // to BasicCommandEncoder — its encode() method does not need a GameModule.
+    final String encoded = encoder.encode(c);
+    if (encoded != null) {
+      return encoded;
+    }
+    throw new IllegalArgumentException(
+      "Cannot encode command type without a GameModule: " + c.getClass().getName()); //$NON-NLS-1$
   }
 
   /**
