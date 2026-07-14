@@ -218,7 +218,7 @@ import static java.lang.Math.round;
  * "context menu" services, and {@link StackMetrics} which handles the "stacking" of game pieces.
  */
 public class Map extends AbstractToolbarItem implements GameComponent, MouseListener, MouseMotionListener, DropTargetListener, Configurable,
-    UniqueIdManager.Identifyable, ToolBarComponent, MutablePropertiesContainer, PropertySource, PlayerRoster.SideChangeListener, ComponentDescription {
+    UniqueIdManager.Identifyable, ToolBarComponent, MutablePropertiesContainer, PropertySource, PlayerRoster.SideChangeListener, ComponentDescription, MapModel {
   protected static boolean changeReportingEnabled = true;
   protected String mapID = ""; //$NON-NLS-1$
   protected String mapName = ""; //$NON-NLS-1$
@@ -2920,6 +2920,17 @@ public class Map extends AbstractToolbarItem implements GameComponent, MouseList
   }
 
   /**
+   * Clears this map's piece and board collections. This is the pure game-state-mutation
+   * portion of {@link #setup(boolean)}'s game-ending path, isolated from the surrounding
+   * window/toolbar/preferences UI work so it can be reasoned about (and eventually reused)
+   * independently of Swing.
+   */
+  protected void resetState() {
+    pieces.clear();
+    boards.clear();
+  }
+
+  /**
    * When a game is started, create a top-level window, if none exists.
    * When a game is ended, remove all boards from the map.
    * @param show true if a game is starting, false if a game is ending
@@ -3021,8 +3032,7 @@ public class Map extends AbstractToolbarItem implements GameComponent, MouseList
       }
     }
     else {
-      pieces.clear();
-      boards.clear();
+      resetState();
 
       if (!g.isLoadOverSemaphore()) {
         if (shouldDockIntoMainWindow()) {
