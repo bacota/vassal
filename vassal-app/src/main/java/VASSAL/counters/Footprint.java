@@ -106,8 +106,15 @@ public class Footprint extends MovementMarkable {
 
   // Local Variables
   protected Rectangle myBoundingBox;
+
+  /** @deprecated Rendering cache moved to {@link FootprintRenderer}; retained for binary compatibility. */
+  @Deprecated(since = "2026-07-14", forRemoval = true)
   protected Font font;
+
+  /** @deprecated Rendering cache moved to {@link FootprintRenderer}; retained for binary compatibility. */
+  @Deprecated(since = "2026-07-14", forRemoval = true)
   protected double lastZoom;
+
   protected boolean localVisibility;
   protected boolean initialized = false; // Protect against multiple re-initializations (this one resets to false in a new session)
   protected boolean everInitialized = false; // Across save/load
@@ -119,6 +126,8 @@ public class Footprint extends MovementMarkable {
   private KeyCommand showTrailCommandClear;
 
   private boolean rotateCheckedOnMove;
+
+  protected PieceRenderer renderer;
 
 
   public Footprint() {
@@ -367,221 +376,280 @@ public class Footprint extends MovementMarkable {
   // FIXME: This method is inefficient.
   @Override
   public void draw(Graphics g, int x, int y, Component obs, double zoom) {
-    piece.draw(g, x, y, obs, zoom);
+    getRenderer().draw(g, x, y, obs, zoom);
+  }
 
-    final Map map = getMap();
+  @Override
+  public PieceRenderer getRenderer() {
+    if (renderer == null) {
+      renderer = new FootprintRenderer(this);
+    }
+    return renderer;
+  }
 
-    // Do nothing when piece is not on a map, we are drawing the map
-    // to something other than its normal view, or the trail is invisible,
-    if (map == null || map.getView() != obs || !isTrailVisible()) {
-      return;
+  /**
+   * @deprecated Moved into {@link FootprintRenderer#drawPoint}; retained for binary
+   * compatibility. Note this delegate is no longer consulted by {@link #draw}, so overriding it
+   * in a subclass has no effect -- override {@link #getRenderer()} instead.
+   */
+  @Deprecated(since = "2026-07-14", forRemoval = true)
+  protected void drawPoint(Graphics g, Point p, double zoom, int elementCount) {
+    ((FootprintRenderer) getRenderer()).drawPoint(g, p, zoom, elementCount);
+  }
+
+  /**
+   * @deprecated Moved into {@link FootprintRenderer#drawTrack}; retained for binary
+   * compatibility. Note this delegate is no longer consulted by {@link #draw}, so overriding it
+   * in a subclass has no effect -- override {@link #getRenderer()} instead.
+   */
+  @Deprecated(since = "2026-07-14", forRemoval = true)
+  protected void drawTrack(Graphics g, int x1, int y1, int x2, int y2, double zoom) {
+    ((FootprintRenderer) getRenderer()).drawTrack(g, x1, y1, x2, y2, zoom);
+  }
+
+  /**
+   * Renders the movement trail (tracks + point circles/icons/text) for a {@link Footprint}.
+   * Holds the font/zoom rendering cache previously kept directly on {@link Footprint}, since
+   * that cache is purely a rendering concern, not game state. Note the draw pass can still
+   * trigger legitimate state changes on the owning trait (e.g. {@link Footprint#clearTrail()}
+   * when the piece has changed maps), exactly as the original inlined {@code draw} did.
+   */
+  protected static class FootprintRenderer implements PieceRenderer {
+    private final Footprint footprint;
+    private Font font;
+    private double lastZoom;
+
+    FootprintRenderer(Footprint footprint) {
+      this.footprint = footprint;
     }
 
-    /*
-     * If we have changed Maps, then start a new trail. Note that this check is
-     * here because setMoved is called before the piece has been moved.
-     */
-    final String currentMap = map.getId();
-    if (!currentMap.equals(startMapId)) {
-      startMapId = currentMap;
-      clearTrail();
-      return;
+    @Override
+    public Rectangle boundingBox() {
+      return footprint.boundingBox();
     }
 
-    // Anything to draw?
-    if (pointList.isEmpty()) {
-      return;
+    @Override
+    public Shape getShape() {
+      return footprint.getShape();
     }
 
-    final Graphics2D g2d = (Graphics2D) g;
-    final double os_scale = g2d.getDeviceConfiguration().getDefaultTransform().getScaleX();
+    @Override
+    public void draw(Graphics g, int x, int y, Component obs, double zoom) {
+      footprint.piece.draw(g, x, y, obs, zoom);
 
-    /*
-     * If we are asked to be drawn at a different zoom from the current map zoom
-     * setting, then don't draw the trail as it will be in the wrong place.
-     * (i.e. Mouse-over viewer)
-     */
-    if (zoom != map.getZoom() * os_scale) {
-      return;
-    }
+      final Map map = footprint.getMap();
 
-    final boolean selected = Boolean.TRUE.equals(
-      getOutermost(this).getProperty(Properties.SELECTED));
-    final int transparencyPercent = Math.max(0, Math.min(100,
-      selected ? selectedTransparency : unSelectedTransparency));
-    final float transparency = transparencyPercent / 100.0f;
-    final Composite oldComposite = g2d.getComposite();
-    final Stroke oldStroke = g2d.getStroke();
-    final Color oldColor = g2d.getColor();
+      // Do nothing when piece is not on a map, we are drawing the map
+      // to something other than its normal view, or the trail is invisible,
+      if (map == null || map.getView() != obs || !footprint.isTrailVisible()) {
+        return;
+      }
 
-    /*
-     * newClip is an overall clipping region made up of the Map itself and a
-     * border of edgeDisplayBuffer pixels. No drawing at all outside this area.
-     * mapRect is made of the Map and a edgePointBuffer pixel border. Trail
-     * points are not drawn outside this area.
-     */
-    final Dimension mapsize = map.mapSize();
-    final int mapHeight = mapsize.height;
-    final int mapWidth = mapsize.width;
+      /*
+       * If we have changed Maps, then start a new trail. Note that this check is
+       * here because setMoved is called before the piece has been moved.
+       */
+      final String currentMap = map.getId();
+      if (!currentMap.equals(footprint.startMapId)) {
+        footprint.startMapId = currentMap;
+        footprint.clearTrail();
+        return;
+      }
 
-    final int edgeHeight =
-      Integer.parseInt(map.getAttributeValueString(Map.EDGE_HEIGHT));
-    final int edgeWidth =
-      Integer.parseInt(map.getAttributeValueString(Map.EDGE_WIDTH));
+      // Anything to draw?
+      if (footprint.pointList.isEmpty()) {
+        return;
+      }
 
-    final int edgeClipHeight = Math.min(edgeHeight, edgeDisplayBuffer);
-    final int edgeClipWidth = Math.min(edgeWidth, edgeDisplayBuffer);
+      final Graphics2D g2d = (Graphics2D) g;
+      final double os_scale = g2d.getDeviceConfiguration().getDefaultTransform().getScaleX();
 
-    final int clipX = edgeWidth - edgeClipWidth;
-    final int clipY = edgeHeight - edgeClipHeight;
-    final int width = mapWidth - 2 * (edgeWidth + edgeClipWidth);
-    final int height = mapHeight - 2 * (edgeHeight + edgeClipHeight);
+      /*
+       * If we are asked to be drawn at a different zoom from the current map zoom
+       * setting, then don't draw the trail as it will be in the wrong place.
+       * (i.e. Mouse-over viewer)
+       */
+      if (zoom != map.getZoom() * os_scale) {
+        return;
+      }
 
-    Rectangle newClip = new Rectangle(
-      (int) (clipX * zoom),
-      (int) (clipY * zoom),
-      (int) (width * zoom),
-      (int) (height * zoom)
-    );
+      final boolean selected = Boolean.TRUE.equals(
+        Decorator.getOutermost(footprint).getProperty(Properties.SELECTED));
+      final int transparencyPercent = Math.max(0, Math.min(100,
+        selected ? footprint.selectedTransparency : footprint.unSelectedTransparency));
+      final float transparency = transparencyPercent / 100.0f;
+      final Composite oldComposite = g2d.getComposite();
+      final Stroke oldStroke = g2d.getStroke();
+      final Color oldColor = g2d.getColor();
 
-    final Rectangle visibleRect =
-      map.componentToDrawing(map.getView().getVisibleRect(), os_scale);
+      /*
+       * newClip is an overall clipping region made up of the Map itself and a
+       * border of edgeDisplayBuffer pixels. No drawing at all outside this area.
+       * mapRect is made of the Map and a edgePointBuffer pixel border. Trail
+       * points are not drawn outside this area.
+       */
+      final Dimension mapsize = map.mapSize();
+      final int mapHeight = mapsize.height;
+      final int mapWidth = mapsize.width;
 
-    final Shape oldClip = g2d.getClip();
+      final int edgeHeight =
+        Integer.parseInt(map.getAttributeValueString(Map.EDGE_HEIGHT));
+      final int edgeWidth =
+        Integer.parseInt(map.getAttributeValueString(Map.EDGE_WIDTH));
 
-    newClip = newClip.intersection(visibleRect);
-    if (oldClip != null) {
-      newClip = oldClip.getBounds().intersection(newClip);
-    }
-    g2d.setClip(newClip);
+      final int edgeClipHeight = Math.min(edgeHeight, footprint.edgeDisplayBuffer);
+      final int edgeClipWidth = Math.min(edgeWidth, footprint.edgeDisplayBuffer);
 
-    g2d.setComposite(
-      AlphaComposite.getInstance(AlphaComposite.SRC_OVER, transparency));
+      final int clipX = edgeWidth - edgeClipWidth;
+      final int clipY = edgeHeight - edgeClipHeight;
+      final int width = mapWidth - 2 * (edgeWidth + edgeClipWidth);
+      final int height = mapHeight - 2 * (edgeHeight + edgeClipHeight);
 
-    final float thickness = Math.max(1.0f, (float)(zoom * lineWidth));
-    g2d.setStroke(new BasicStroke(thickness));
-    g2d.setColor(lineColor);
+      Rectangle newClip = new Rectangle(
+        (int) (clipX * zoom),
+        (int) (clipY * zoom),
+        (int) (width * zoom),
+        (int) (height * zoom)
+      );
 
-    final Rectangle circleRect = new Rectangle(
-      edgeWidth - edgePointBuffer,
-      edgeHeight - edgePointBuffer,
-      mapWidth + 2 * edgePointBuffer,
-      mapHeight + 2 * edgePointBuffer
-    );
+      final Rectangle visibleRect =
+        map.componentToDrawing(map.getView().getVisibleRect(), os_scale);
 
-    /*
-     * Draw the tracks between trail points
-     */
-    int x1, y1, x2, y2;
-    final Iterator<Point> i = pointList.iterator();
-    Point cur = i.next(), next;
-    while (i.hasNext()) {
-      next = i.next();
+      final Shape oldClip = g2d.getClip();
 
-      x1 = (int)(cur.x * zoom);
-      y1 = (int)(cur.y * zoom);
-      x2 = (int)(next.x * zoom);
-      y2 = (int)(next.y * zoom);
+      newClip = newClip.intersection(visibleRect);
+      if (oldClip != null) {
+        newClip = oldClip.getBounds().intersection(newClip);
+      }
+      g2d.setClip(newClip);
 
-      drawTrack(g, x1, y1, x2, y2, zoom);
+      g2d.setComposite(
+        AlphaComposite.getInstance(AlphaComposite.SRC_OVER, transparency));
 
-      cur = next;
-    }
+      final float thickness = Math.max(1.0f, (float)(zoom * footprint.lineWidth));
+      g2d.setStroke(new BasicStroke(thickness));
+      g2d.setColor(footprint.lineColor);
 
-    final Point here = getPosition();
-    if (!here.equals(cur)) {
-      x1 = (int)(cur.x * zoom);
-      y1 = (int)(cur.y * zoom);
-      x2 = (int)(here.x * zoom);
-      y2 = (int)(here.y * zoom);
+      final Rectangle circleRect = new Rectangle(
+        edgeWidth - footprint.edgePointBuffer,
+        edgeHeight - footprint.edgePointBuffer,
+        mapWidth + 2 * footprint.edgePointBuffer,
+        mapHeight + 2 * footprint.edgePointBuffer
+      );
 
-      drawTrack(g, x1, y1, x2, y2, zoom);
-    }
+      /*
+       * Draw the tracks between trail points
+       */
+      int x1, y1, x2, y2;
+      final Iterator<Point> i = footprint.pointList.iterator();
+      Point cur = i.next(), next;
+      while (i.hasNext()) {
+        next = i.next();
 
-    /*
-     * And draw the points themselves.
-     */
-    int elementCount = -1;
-    for (final Point p : pointList) {
-      ++elementCount;
+        x1 = (int)(cur.x * zoom);
+        y1 = (int)(cur.y * zoom);
+        x2 = (int)(next.x * zoom);
+        y2 = (int)(next.y * zoom);
 
-      if (circleRect.contains(p) && !p.equals(here)) {
-        drawPoint(g, p, zoom, elementCount);
+        drawTrack(g, x1, y1, x2, y2, zoom);
 
-        // Is there an Icon to draw in the circle?
-        final Image image = getTrailImage(elementCount);
-        x1 = (int)((p.x - circleRadius) * zoom);
-        y1 = (int)((p.y - circleRadius) * zoom);
-        if (selected && image != null) {
-          if (zoom == 1.0) {
-            g.drawImage(image, x1, y1, obs);
+        cur = next;
+      }
+
+      final Point here = footprint.getPosition();
+      if (!here.equals(cur)) {
+        x1 = (int)(cur.x * zoom);
+        y1 = (int)(cur.y * zoom);
+        x2 = (int)(here.x * zoom);
+        y2 = (int)(here.y * zoom);
+
+        drawTrack(g, x1, y1, x2, y2, zoom);
+      }
+
+      /*
+       * And draw the points themselves.
+       */
+      int elementCount = -1;
+      for (final Point p : footprint.pointList) {
+        ++elementCount;
+
+        if (circleRect.contains(p) && !p.equals(here)) {
+          drawPoint(g, p, zoom, elementCount);
+
+          // Is there an Icon to draw in the circle?
+          final Image image = footprint.getTrailImage(elementCount);
+          x1 = (int)((p.x - footprint.circleRadius) * zoom);
+          y1 = (int)((p.y - footprint.circleRadius) * zoom);
+          if (selected && image != null) {
+            if (zoom == 1.0) {
+              g.drawImage(image, x1, y1, obs);
+            }
+            else {
+              final Image scaled =
+                ImageUtils.transform((BufferedImage) image, zoom, 0.0);
+              g.drawImage(scaled, x1, y1, obs);
+            }
           }
-          else {
-            final Image scaled =
-              ImageUtils.transform((BufferedImage) image, zoom, 0.0);
-            g.drawImage(scaled, x1, y1, obs);
-          }
-        }
 
-        // Or some text?
-        final String text = getTrailText(elementCount);
-        if (selected && text != null) {
-          if (font == null || lastZoom != zoom) {
-            x1 = (int)(p.x * zoom);
-            y1 = (int)(p.y * zoom);
-            final Font font =
-              new Font(Font.DIALOG, Font.PLAIN, (int)(circleRadius * 1.4 * zoom));
-            LabelUtils.drawLabel(
-              g, text, x1, y1,
-              font, LabelUtils.CENTER, LabelUtils.CENTER,
-              lineColor, null, null
-            );
+          // Or some text?
+          final String text = footprint.getTrailText(elementCount);
+          if (selected && text != null) {
+            if (font == null || lastZoom != zoom) {
+              x1 = (int)(p.x * zoom);
+              y1 = (int)(p.y * zoom);
+              final Font font =
+                new Font(Font.DIALOG, Font.PLAIN, (int)(footprint.circleRadius * 1.4 * zoom));
+              LabelUtils.drawLabel(
+                g, text, x1, y1,
+                font, LabelUtils.CENTER, LabelUtils.CENTER,
+                footprint.lineColor, null, null
+              );
 
+            }
+            lastZoom = zoom;
           }
-          lastZoom = zoom;
         }
       }
+
+      g2d.setComposite(oldComposite);
+      g2d.setStroke(oldStroke);
+      g2d.setColor(oldColor);
+      g.setClip(oldClip);
     }
 
-    g2d.setComposite(oldComposite);
-    g2d.setStroke(oldStroke);
-    g2d.setColor(oldColor);
-    g.setClip(oldClip);
-  }
-
-  /**
-   * Draw a Circle at the given point.
-   * Override this method to do something different (eg. display an Icon)
-   */
-  protected void drawPoint(Graphics g, Point p, double zoom, @SuppressWarnings("unused") int elementCount) {
-    final int x = (int)((p.x - circleRadius) * zoom);
-    final int y = (int)((p.y - circleRadius) * zoom);
-    final int radius = (int)(2 * circleRadius * zoom);
-    g.setColor(fillColor);
-    g.fillOval(x, y, radius, radius);
-    g.setColor(lineColor);
-    g.drawOval(x, y, radius, radius);
-  }
-
-  /**
-   * Draw a track from one Point to another.
-   * Don't draw under the circle as it shows
-   * through with transparency turned on.
-   */
-  protected void drawTrack(Graphics g, int x1, int y1, int x2, int y2, double zoom) {
-    double lastSqrt = -1;
-    int lastDistSq = -1;
-
-    final int distSq = (x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1);
-    if (distSq != lastDistSq) {
-      lastDistSq = distSq;
-      lastSqrt = Math.sqrt(distSq);
+    /**
+     * Draw a Circle at the given point.
+     */
+    void drawPoint(Graphics g, Point p, double zoom, @SuppressWarnings("unused") int elementCount) {
+      final int x = (int)((p.x - footprint.circleRadius) * zoom);
+      final int y = (int)((p.y - footprint.circleRadius) * zoom);
+      final int radius = (int)(2 * footprint.circleRadius * zoom);
+      g.setColor(footprint.fillColor);
+      g.fillOval(x, y, radius, radius);
+      g.setColor(footprint.lineColor);
+      g.drawOval(x, y, radius, radius);
     }
 
-    final int xDiff = (int) ((circleRadius * (x2 - x1) * zoom) / lastSqrt);
-    final int yDiff = (int) ((circleRadius * (y2 - y1) * zoom) / lastSqrt);
+    /**
+     * Draw a track from one Point to another.
+     * Don't draw under the circle as it shows
+     * through with transparency turned on.
+     */
+    void drawTrack(Graphics g, int x1, int y1, int x2, int y2, double zoom) {
+      double lastSqrt = -1;
+      int lastDistSq = -1;
 
-    g.drawLine(x1 + xDiff, y1 + yDiff, x2 - xDiff, y2 - yDiff);
+      final int distSq = (x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1);
+      if (distSq != lastDistSq) {
+        lastDistSq = distSq;
+        lastSqrt = Math.sqrt(distSq);
+      }
+
+      final int xDiff = (int) ((footprint.circleRadius * (x2 - x1) * zoom) / lastSqrt);
+      final int yDiff = (int) ((footprint.circleRadius * (y2 - y1) * zoom) / lastSqrt);
+
+      g.drawLine(x1 + xDiff, y1 + yDiff, x2 - xDiff, y2 - yDiff);
+    }
   }
 
   /**
