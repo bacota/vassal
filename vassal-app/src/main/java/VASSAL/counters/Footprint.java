@@ -474,7 +474,7 @@ public class Footprint extends MovementMarkable {
       }
 
       final boolean selected = Boolean.TRUE.equals(
-        Decorator.getOutermost(footprint).getProperty(Properties.SELECTED));
+        getOutermost(footprint).getProperty(Properties.SELECTED));
       final int transparencyPercent = Math.max(0, Math.min(100,
         selected ? footprint.selectedTransparency : footprint.unSelectedTransparency));
       final float transparency = transparencyPercent / 100.0f;
