@@ -11,6 +11,12 @@ jdoc/
 tmp/
 git.properties
 
+# local corpus of real modules/saves/logs used to regenerate
+# vassal-app/src/test/resources/fixtures/ via capture-fixtures.sh -- not
+# checked in (large, possibly-licensed game files); the fixtures it produces are.
+/example-artifacts/
+/.fixtures-classpath.txt
+
 # IntelliJ
 *.iml
 .idea/
