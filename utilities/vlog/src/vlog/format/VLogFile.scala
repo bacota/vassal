@@ -1,10 +1,8 @@
 package vlog.format
 
-import java.io.{ByteArrayOutputStream, File}
 import java.nio.charset.StandardCharsets
-import java.nio.file.{Files, Path}
-import java.util.zip.{ZipEntry, ZipFile}
-import scala.jdk.CollectionConverters.*
+import java.nio.file.Path
+import java.util.zip.ZipFile
 import scala.util.Using
 
 /** The two well-known zip entry names inside a .vlog file, per
@@ -14,11 +12,6 @@ import scala.util.Using
 object VLogFile:
   val SavedGameEntry = "savedGame"
   val MetadataEntry = "savedata"
-
-  /** The ASCII ESC character (0x1B) VASSAL uses to separate top-level
-    * commands in the flattened log/command string (GameModule.COMMAND_SEPARATOR).
-    */
-  val CommandSeparator: Char = 0x1B.toChar
 
   def read(path: Path): VLogFile =
     Using.resource(new ZipFile(path.toFile)) { zip =>
@@ -39,12 +32,15 @@ object VLogFile:
         throw new IllegalArgumentException(s"$path does not contain a '$SavedGameEntry' entry")
       )
 
-      val commands = SequenceCodec.decode(commandString, CommandSeparator).filter(_.nonEmpty)
-
-      VLogFile(commands, metadataXml)
+      VLogFile(commandString, metadataXml)
     }
 
+/** @param commandString the deobfuscated, still-encoded contents of the
+  *   'savedGame' zip entry: a recursively ESC-joined Command tree, per
+  *   VASSAL.build.GameModule.encode/decode. Use vlog.command.CommandTree.flatten
+  *   to turn this into an ordered list of leaf Commands.
+  */
 case class VLogFile(
-    commands: Vector[String],
+    commandString: String,
     metadataXml: Option[String]
 )

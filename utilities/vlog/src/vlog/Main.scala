@@ -1,5 +1,6 @@
 package vlog
 
+import vlog.command.CommandTree
 import vlog.format.VLogFile
 import java.nio.file.Paths
 
@@ -16,7 +17,8 @@ import java.nio.file.Paths
     println()
   }
 
-  println(s"=== ${file.commands.size} command(s) ===")
-  file.commands.zipWithIndex.foreach { case (cmd, i) =>
+  val commands = CommandTree.flatten(file.commandString)
+  println(s"=== ${commands.size} command(s) ===")
+  commands.zipWithIndex.foreach { case (cmd, i) =>
     println(s"[$i] $cmd")
   }
