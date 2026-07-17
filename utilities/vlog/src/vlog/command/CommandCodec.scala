@@ -57,18 +57,20 @@ object CommandCodec:
         )
     else if token.startsWith(MovePrefix) then
       val fields = SequenceCodec.decode(token.substring(MovePrefix.length), FieldSep)
-      MovePieceCmd(
-        id = fields(0),
-        newMapId = unwrapNull(fields(1)),
-        newX = fields(2).toInt,
-        newY = fields(3).toInt,
-        newUnderId = unwrapNull(fields(4)),
-        oldMapId = unwrapNull(fields(5)),
-        oldX = fields(6).toInt,
-        oldY = fields(7).toInt,
-        oldUnderId = unwrapNull(fields(8)),
-        playerId = fields.lift(9).flatMap(unwrapNull)
-      )
+      if fields.length < 9 then UnknownCmd(token)
+      else
+        MovePieceCmd(
+          id = fields(0),
+          newMapId = unwrapNull(fields(1)),
+          newX = fields(2).toInt,
+          newY = fields(3).toInt,
+          newUnderId = unwrapNull(fields(4)),
+          oldMapId = unwrapNull(fields(5)),
+          oldX = fields(6).toInt,
+          oldY = fields(7).toInt,
+          oldUnderId = unwrapNull(fields(8)),
+          playerId = fields.lift(9).flatMap(unwrapNull)
+        )
     else
       UnknownCmd(token)
 
