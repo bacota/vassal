@@ -23,6 +23,7 @@ import VASSAL.build.AutoConfigurable;
 import VASSAL.build.BadDataReport;
 import VASSAL.build.Buildable;
 import VASSAL.build.Configurable;
+import VASSAL.build.ConfigurableEditor;
 import VASSAL.build.GameModule;
 import VASSAL.configure.AutoConfigurer;
 import VASSAL.configure.Configurer;
@@ -75,7 +76,7 @@ import java.util.zip.ZipOutputStream;
  *
  * @author rkinney
  */
-public class BrowserHelpFile extends AbstractBuildable implements Configurable {
+public class BrowserHelpFile extends AbstractBuildable implements Configurable, ConfigurableEditor {
   private static final Logger logger =
     LoggerFactory.getLogger(BrowserHelpFile.class);
 

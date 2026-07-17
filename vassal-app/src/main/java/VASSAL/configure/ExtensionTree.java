@@ -20,6 +20,7 @@ package VASSAL.configure;
 import VASSAL.build.Buildable;
 import VASSAL.build.Builder;
 import VASSAL.build.Configurable;
+import VASSAL.build.ConfigurableEditor;
 import VASSAL.build.module.ExtensionElement;
 import VASSAL.build.module.ModuleExtension;
 import VASSAL.build.module.documentation.HelpWindow;
@@ -138,7 +139,7 @@ public class ExtensionTree extends ConfigureTree {
 
           final int finalIndex = (index < 0) ? getTreeNode(target).getChildCount() : checkMinimumIndex(getTreeNode(target), index);
 
-          if (child.getConfigurer() != null) {
+          if (ConfigurableEditor.getConfigurerOf(child) != null) {
             if (insert(target, child, finalIndex)) {
               final PropertiesWindow w = new PropertiesWindow((Frame) SwingUtilities.getAncestorOfClass(Frame.class, ExtensionTree.this), false, child, helpWindow) {
                 private static final long serialVersionUID = 1L;
@@ -183,7 +184,7 @@ public class ExtensionTree extends ConfigureTree {
         if (child != null) {
           try {
             child.build(null);
-            if (child.getConfigurer() != null) {
+            if (ConfigurableEditor.getConfigurerOf(child) != null) {
               final PropertiesWindow w = new PropertiesWindow((Frame) SwingUtilities.getAncestorOfClass(Frame.class, ExtensionTree.this), false, child, helpWindow) {
                 private static final long serialVersionUID = 1L;
 
@@ -415,7 +416,7 @@ public class ExtensionTree extends ConfigureTree {
     super.updateEditMenu();
     deleteAction.setEnabled(selected != null && isEditable(selected));
     cutAction.setEnabled(selected != null && isEditable(selected));
-    propertiesAction.setEnabled(selected != null && isEditable(selected) && selected.getConfigurer() != null);
+    propertiesAction.setEnabled(selected != null && isEditable(selected) && ConfigurableEditor.getConfigurerOf(selected) != null);
   }
 
 

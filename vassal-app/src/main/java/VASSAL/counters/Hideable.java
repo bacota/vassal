@@ -68,10 +68,7 @@ public class Hideable extends Decorator implements TranslatablePiece {
   protected KeyCommand hideCommand;
   protected String description = "";
 
-  // Cache the Hidden image that is shown to the owner. Only re-generate when Zoom or piece state changes.
-  protected BufferedImage cachedImage;
-  protected double cachedZoom = -1d;
-  protected String cachedState = "";
+  protected PieceRenderer renderer;
 
   @Override
   public void setProperty(Object key, Object val) {
@@ -183,83 +180,124 @@ public class Hideable extends Decorator implements TranslatablePiece {
 
   @Override
   public Shape getShape() {
-    if (invisibleToMe()) {
-      return new Rectangle();
-    }
-    else {
-      return piece.getShape();
-    }
+    return getRenderer().getShape();
   }
 
   @Override
   public Rectangle boundingBox() {
-    if (invisibleToMe()) {
-      return new Rectangle();
-    }
-    else {
-      return piece.boundingBox();
-    }
+    return getRenderer().boundingBox();
   }
 
   @Override
   public void draw(Graphics g, int x, int y, Component obs, double zoom) {
-    if (invisibleToMe()) {
-      return;
+    getRenderer().draw(g, x, y, obs, zoom);
+  }
+
+  @Override
+  public PieceRenderer getRenderer() {
+    if (renderer == null) {
+      renderer = new HideableRenderer(this);
+    }
+    return renderer;
+  }
+
+  /**
+   * Renders the fade/transparency effect for a hidden piece. Holds the offscreen image cache
+   * previously kept directly on {@link Hideable}, since that cache is purely a rendering
+   * concern, not game state.
+   */
+  protected static class HideableRenderer implements PieceRenderer {
+    private final Hideable hideable;
+
+    // Cache the Hidden image that is shown to the owner. Only re-generate when Zoom or piece state changes.
+    private BufferedImage cachedImage;
+    private double cachedZoom = -1d;
+    private String cachedState = "";
+
+    HideableRenderer(Hideable hideable) {
+      this.hideable = hideable;
     }
 
-    if (invisibleToOthers()) {
-      final Graphics2D g2d = (Graphics2D) g;
-
-      if (bgColor != null) {
-        g.setColor(bgColor);
-        final AffineTransform t = AffineTransform.getScaleInstance(zoom, zoom);
-        t.translate(x / zoom, y / zoom);
-        g2d.fill(t.createTransformedShape(piece.getShape()));
+    @Override
+    public Shape getShape() {
+      if (hideable.invisibleToMe()) {
+        return new Rectangle();
       }
+      else {
+        return hideable.piece.getShape();
+      }
+    }
 
-      // Determine piece bounds at current zoom
-      final Rectangle bounds = piece.getShape().getBounds();
-      final int w = (int) Math.ceil(bounds.width * zoom);
-      final int h = (int) Math.ceil(bounds.height * zoom);
+    @Override
+    public Rectangle boundingBox() {
+      if (hideable.invisibleToMe()) {
+        return new Rectangle();
+      }
+      else {
+        return hideable.piece.boundingBox();
+      }
+    }
 
-      // If there's nothing visible at this zoom, skip
-      if (w <= 0 || h <= 0) {
+    @Override
+    public void draw(Graphics g, int x, int y, Component obs, double zoom) {
+      if (hideable.invisibleToMe()) {
         return;
       }
 
-      final String visibleState = (String) piece.getProperty(Properties.VISIBLE_STATE);
-      if (cachedImage == null || zoom != cachedZoom || ! cachedState.equals(visibleState)) {
+      if (hideable.invisibleToOthers()) {
+        final Graphics2D g2d = (Graphics2D) g;
 
-        // Create an in-memory cached image and draw piece fully opaque
-        cachedImage = ImageUtils.createCompatibleTranslucentImage(w, h);
-        cachedZoom = zoom;
-        cachedState = visibleState;
-
-        final Graphics2D cg = cachedImage.createGraphics();
-        try {
-          cg.scale(zoom, zoom);
-          cg.translate(-bounds.x, -bounds.y);
-
-          piece.draw(cg, 0, 0, obs, 1.0); // Fully opaque
+        if (hideable.bgColor != null) {
+          g.setColor(hideable.bgColor);
+          final AffineTransform t = AffineTransform.getScaleInstance(zoom, zoom);
+          t.translate(x / zoom, y / zoom);
+          g2d.fill(t.createTransformedShape(hideable.piece.getShape()));
         }
-        finally {
-          cg.dispose();
+
+        // Determine piece bounds at current zoom
+        final Rectangle bounds = hideable.piece.getShape().getBounds();
+        final int w = (int) Math.ceil(bounds.width * zoom);
+        final int h = (int) Math.ceil(bounds.height * zoom);
+
+        // If there's nothing visible at this zoom, skip
+        if (w <= 0 || h <= 0) {
+          return;
         }
+
+        final String visibleState = (String) hideable.piece.getProperty(Properties.VISIBLE_STATE);
+        if (cachedImage == null || zoom != cachedZoom || ! cachedState.equals(visibleState)) {
+
+          // Create an in-memory cached image and draw piece fully opaque
+          cachedImage = ImageUtils.createCompatibleTranslucentImage(w, h);
+          cachedZoom = zoom;
+          cachedState = visibleState;
+
+          final Graphics2D cg = cachedImage.createGraphics();
+          try {
+            cg.scale(zoom, zoom);
+            cg.translate(-bounds.x, -bounds.y);
+
+            hideable.piece.draw(cg, 0, 0, obs, 1.0); // Fully opaque
+          }
+          finally {
+            cg.dispose();
+          }
+        }
+
+        // Apply the appropriate transparency to the overall image
+        final Composite oldComp = g2d.getComposite();
+        g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, hideable.transparency));
+
+        final int drawX = x + (int) Math.round(bounds.x * zoom);
+        final int drawY = y + (int) Math.round(bounds.y * zoom);
+        g2d.drawImage(cachedImage, drawX, drawY, obs);
+
+        g2d.setComposite(oldComp);
       }
-
-      // Apply the appropriate transparency to the overall image
-      final Composite oldComp = g2d.getComposite();
-      g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, transparency));
-
-      final int drawX = x + (int) Math.round(bounds.x * zoom);
-      final int drawY = y + (int) Math.round(bounds.y * zoom);
-      g2d.drawImage(cachedImage, drawX, drawY, obs);
-
-      g2d.setComposite(oldComp);
-    }
-    else {
-      // Normal draw at the end
-      piece.draw(g, x, y, obs, zoom);
+      else {
+        // Normal draw at the end
+        hideable.piece.draw(g, x, y, obs, zoom);
+      }
     }
   }
 

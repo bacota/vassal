@@ -23,6 +23,7 @@ import org.w3c.dom.Element;
 import org.w3c.dom.NamedNodeMap;
 
 import VASSAL.configure.AutoConfigurer;
+import VASSAL.configure.Configurer;
 import VASSAL.configure.VisibilityCondition;
 import VASSAL.i18n.Localization;
 
@@ -30,7 +31,17 @@ import VASSAL.i18n.Localization;
  * A class that implements AutoConfigurable can use the {@link AutoConfigurer}
  * class to automatically build a property editor.
  */
-public interface AutoConfigurable extends Configurable {
+public interface AutoConfigurable extends Configurable, ConfigurableEditor {
+  /**
+   * Every {@link AutoConfigurable} is expected to be editable (that's the point of the
+   * interface), so re-declare this as mandatory here rather than relying on
+   * {@link Configurable}'s optional default.
+   * @return a {@link VASSAL.configure.Configurer} object which can be used to set the
+   * attributes of this object
+   */
+  @Override
+  Configurer getConfigurer();
+
   /**
    * @return an array of Strings giving all attributes of this Buildable
    * component that will be written to/read from an XML element

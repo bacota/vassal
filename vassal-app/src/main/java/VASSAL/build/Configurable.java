@@ -63,10 +63,18 @@ public interface Configurable extends Translatable {
   Configurable[] getConfigureComponents();
 
   /**
-   * @return a {@link Configurer} object which can be used to set the
-   * attributes of this object
+   * @return a {@link Configurer} object which can be used to set the attributes of this object,
+   * or {@code null} if this object has no editable attributes/no editing UI. Unlike prior
+   * versions, this is no longer a method every {@link Configurable} implementor must provide:
+   * it defaults to delegating to {@link ConfigurableEditor} if the implementing class also
+   * implements that (optional) interface, and to {@code null} otherwise. This keeps the core
+   * {@link Configurable}/{@link Buildable} build-tree contract free of any *requirement* to
+   * provide Swing-based editing UI, while remaining source- and binary-compatible with existing
+   * callers and implementors of {@link #getConfigurer()}.
    */
-  Configurer getConfigurer();
+  default Configurer getConfigurer() {
+    return ConfigurableEditor.getConfigurerOf(this);
+  }
 
   /**
    * @return a list of valid sub-component Classes.  If a Class
