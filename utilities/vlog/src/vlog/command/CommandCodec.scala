@@ -39,8 +39,11 @@ object CommandCodec:
     else if token.startsWith(AudioPrefix) then
       PlayAudioClipCmd(token.substring(AudioPrefix.length))
     else if token.startsWith(AddPrefix) then
-      val fields = SequenceCodec.decode(token.substring(AddPrefix.length), FieldSep)
-      AddPieceCmd(id = fields(0), pieceType = fields(1), state = fields(2))
+      SequenceCodec.decode(token.substring(AddPrefix.length), FieldSep) match
+        case Vector(id, pieceType, state) =>
+          AddPieceCmd(id = id, pieceType = pieceType, state = state)
+        case _ =>
+          UnknownCmd(token)
     else if token.startsWith(RemovePrefix) then
       RemovePieceCmd(id = token.substring(RemovePrefix.length))
     else if token.startsWith(ChangePrefix) then
