@@ -11,8 +11,9 @@ object Obfuscation:
   private val Header = "!VCSK"
 
   def isObfuscated(bytes: Array[Byte]): Boolean =
-    bytes.length >= Header.length &&
-      new String(bytes, 0, Header.length, "US-ASCII") == Header
+    bytes.length >= Header.length + 2 &&
+      new String(bytes, 0, Header.length, "US-ASCII") == Header &&
+      ((bytes.length - Header.length - 2) % 2 == 0)
 
   /** Decode an obfuscated entry back to its plaintext bytes.
     * If the header is absent, the bytes are returned unchanged, mirroring
@@ -23,13 +24,16 @@ object Obfuscation:
     else
       val keyHex = new String(bytes, Header.length, 2, "US-ASCII")
       val key = Integer.parseInt(keyHex, 16).toByte
-      val hexBody = new String(bytes, Header.length + 2, bytes.length - Header.length - 2, "US-ASCII")
+      val hexBody =
+        new String(bytes, Header.length + 2, bytes.length - Header.length - 2, "US-ASCII")
       val out = new Array[Byte](hexBody.length / 2)
       var i = 0
       while i < out.length do
         val hi = Character.digit(hexBody.charAt(i * 2), 16)
         val lo = Character.digit(hexBody.charAt(i * 2 + 1), 16)
-        out(i) = ((hi << 4 | lo) ^ key).toByte
+        if hi < 0 || lo < 0 then
+          throw new IllegalArgumentException("Invalid hex in obfuscated body")
+        out(i) = (((hi << 4) | lo) ^ key).toByte
         i += 1
       out
 
