@@ -48,11 +48,13 @@ object CommandCodec:
       RemovePieceCmd(id = token.substring(RemovePrefix.length))
     else if token.startsWith(ChangePrefix) then
       val fields = SequenceCodec.decode(token.substring(ChangePrefix.length), FieldSep)
-      ChangePieceCmd(
-        id = fields(0),
-        newState = fields(1),
-        oldState = fields.lift(2)
-      )
+      if fields.length < 2 then UnknownCmd(token)
+      else
+        ChangePieceCmd(
+          id = fields(0),
+          newState = fields(1),
+          oldState = fields.lift(2)
+        )
     else if token.startsWith(MovePrefix) then
       val fields = SequenceCodec.decode(token.substring(MovePrefix.length), FieldSep)
       MovePieceCmd(
