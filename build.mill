@@ -1,0 +1,51 @@
+package build
+
+import mill._
+import mill.scalalib._
+import mill.scalajslib._
+
+object versions {
+  val scala = "3.3.4"
+  val scalaJS = "1.17.0"
+  val munit = "1.0.0"
+}
+
+/** vassal-core: the format-critical logic (zip I/O, buildFile.xml model,
+  * Command/CommandEncoder graph, GameState/GameModule/property system),
+  * cross-compiled to run identically on the JVM and in the browser. Source
+  * lives in a single shared tree (core/src) so the JVM and Scala.js builds
+  * can never drift from each other -- see notes.txt / ARCHITECTURE_NOTES.md.
+  */
+object core extends Module {
+  trait Shared extends ScalaModule {
+    def scalaVersion = versions.scala
+    override def sources = Task.Sources(moduleDir / os.up / "src")
+  }
+
+  object jvm extends Shared {
+    object test extends ScalaTests with TestModule.Munit {
+      def mvnDeps = Seq(mvn"org.scalameta::munit::${versions.munit}")
+      override def sources = Task.Sources(moduleDir / os.up / os.up / "test" / "src")
+    }
+  }
+
+  object js extends Shared with ScalaJSModule {
+    def scalaJSVersion = versions.scalaJS
+  }
+}
+
+/** Regression-comparison JVM app: exercises vassal-core's JVM build against
+  * the Phase-0 fixture corpus (vassal-app/src/test/resources/fixtures). Not
+  * a replacement for the legacy Maven-built vassal-app.
+  */
+object `jvm-app` extends ScalaModule {
+  def scalaVersion = versions.scala
+  def moduleDeps = Seq(core.jvm)
+}
+
+/** New Scala.js browser UI. Empty scaffold until Phase 3. */
+object `js-app` extends ScalaJSModule {
+  def scalaVersion = versions.scala
+  def scalaJSVersion = versions.scalaJS
+  def moduleDeps = Seq(core.js)
+}
