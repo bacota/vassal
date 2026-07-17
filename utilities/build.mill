@@ -1,0 +1,18 @@
+package build
+
+import mill._
+import mill.scalalib._
+
+object vlog extends ScalaModule {
+  def scalaVersion = "3.3.4"
+
+  def mvnDeps = Seq(
+    mvn"org.scala-lang.modules::scala-xml:2.3.0"
+  )
+
+  object test extends ScalaTests with TestModule.ScalaTest {
+    def mvnDeps = Seq(
+      mvn"org.scalatest::scalatest:3.2.19"
+    )
+  }
+}
