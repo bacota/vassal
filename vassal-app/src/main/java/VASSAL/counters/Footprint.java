@@ -394,7 +394,10 @@ public class Footprint extends MovementMarkable {
    */
   @Deprecated(since = "2026-07-14", forRemoval = true)
   protected void drawPoint(Graphics g, Point p, double zoom, int elementCount) {
-    ((FootprintRenderer) getRenderer()).drawPoint(g, p, zoom, elementCount);
+    final PieceRenderer r = getRenderer();
+    if (r instanceof FootprintRenderer) {
+      ((FootprintRenderer) r).drawPoint(g, p, zoom, elementCount);
+    }
   }
 
   /**
@@ -404,7 +407,10 @@ public class Footprint extends MovementMarkable {
    */
   @Deprecated(since = "2026-07-14", forRemoval = true)
   protected void drawTrack(Graphics g, int x1, int y1, int x2, int y2, double zoom) {
-    ((FootprintRenderer) getRenderer()).drawTrack(g, x1, y1, x2, y2, zoom);
+    final PieceRenderer r = getRenderer();
+    if (r instanceof FootprintRenderer) {
+      ((FootprintRenderer) r).drawTrack(g, x1, y1, x2, y2, zoom);
+    }
   }
 
   /**
@@ -594,19 +600,18 @@ public class Footprint extends MovementMarkable {
           // Or some text?
           final String text = footprint.getTrailText(elementCount);
           if (selected && text != null) {
+            x1 = (int)(p.x * zoom);
+            y1 = (int)(p.y * zoom);
             if (font == null || lastZoom != zoom) {
-              x1 = (int)(p.x * zoom);
-              y1 = (int)(p.y * zoom);
-              final Font font =
+              font =
                 new Font(Font.DIALOG, Font.PLAIN, (int)(footprint.circleRadius * 1.4 * zoom));
-              LabelUtils.drawLabel(
-                g, text, x1, y1,
-                font, LabelUtils.CENTER, LabelUtils.CENTER,
-                footprint.lineColor, null, null
-              );
-
+              lastZoom = zoom;
             }
-            lastZoom = zoom;
+            LabelUtils.drawLabel(
+              g, text, x1, y1,
+              font, LabelUtils.CENTER, LabelUtils.CENTER,
+              footprint.lineColor, null, null
+            );
           }
         }
       }
