@@ -45,13 +45,13 @@ shopt -s nullglob nocaseglob
 for dir in "$ARTIFACTS_DIR"/*/; do
   name="$(basename "$dir")"
 
-  vmods=("$dir"*.vmod)
+  vmods=("$dir"*.vmod "$dir"*.vmdx)
   if [ ${#vmods[@]} -eq 0 ]; then
-    echo "skip $name: no .vmod found"
+    echo "skip $name: no .vmod or .vmdx found"
     continue
   fi
   if [ ${#vmods[@]} -gt 1 ]; then
-    echo "skip $name: multiple .vmod files found, expected one (${vmods[*]})"
+    echo "skip $name: multiple module files found, expected one (${vmods[*]})"
     continue
   fi
   vmod="${vmods[0]}"
