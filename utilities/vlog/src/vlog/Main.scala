@@ -3,7 +3,7 @@ package vlog
 import vlog.command.CommandTree
 import vlog.format.VLogFile
 import vlog.module.{GridValidation, LocationResolver}
-import vlog.moves.{Move, MoveExtractor}
+import vlog.moves.MoveExtractor
 import vlog.prune.LogPruner
 import java.nio.file.Paths
 
