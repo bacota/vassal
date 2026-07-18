@@ -6,6 +6,9 @@ import mill.scalalib._
 object vlog extends ScalaModule {
   def scalaVersion = "3.3.4"
 
+  // Entry point used by the assembly jar and the `vlog` wrapper script.
+  def mainClass = Some("vlog.run")
+
   def mvnDeps = Seq(
     mvn"org.scala-lang.modules::scala-xml:2.3.0"
   )

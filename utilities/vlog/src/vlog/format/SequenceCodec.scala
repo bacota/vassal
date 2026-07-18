@@ -39,6 +39,34 @@ object SequenceCodec:
       sb.append(c)
     sb.toString
 
+  /** Splits a string into the exact, still-escaped substrings that lie
+    * between top-level (unescaped) delimiters, WITHOUT unescaping or
+    * unquoting them. This is the verbatim counterpart to [[decode]]: it
+    * finds delimiter boundaries by exactly the same rule the Decoder uses
+    * (a delimiter char counts as a separator unless the immediately
+    * preceding char is a backslash), so `rawSplit` and `decode` always
+    * return the same number of tokens split at the same positions — but
+    * `rawSplit` keeps each token byte-for-byte as it appeared in `s`.
+    *
+    * This lets a caller drop or reorder whole tokens and rejoin the kept
+    * ones with the delimiter to get a result that is byte-identical to the
+    * original for every untouched token (no re-escaping or re-quoting).
+    */
+  def rawSplit(s: String, delimiter: Char): Vector[String] =
+    if s == null then Vector.empty
+    else
+      val out = Vector.newBuilder[String]
+      var start = 0
+      var i = 0
+      val n = s.length
+      while i < n do
+        if s.charAt(i) == delimiter && !(i > 0 && s.charAt(i - 1) == '\\') then
+          out += s.substring(start, i)
+          start = i + 1
+        i += 1
+      out += s.substring(start)
+      out.result()
+
   /** Splits a whole delimited string into all of its tokens, mirroring
     * repeated calls to SequenceEncoder.Decoder#nextToken() until exhausted.
     */

@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+#
+# vlog — inspect or clean up VASSAL .vlog log files.
+#
+#   vlog strip <in.vlog> <out.vlog>   Copy a log with all undone commands removed
+#   vlog dump  <file.vlog>            Print the log's metadata and decoded commands
+#
+# When a player records a logfile they often hit Undo to back up a few steps
+# and start over. VASSAL keeps both the false starts and the undo actions in
+# the file; `vlog strip` removes each undo along with the command it took back,
+# producing a smaller log that replays to the same final position.
+#
+# The first run builds a standalone jar with Mill (needs a JDK and network the
+# first time to fetch Mill/deps); later runs reuse the jar and start instantly.
+# Set VLOG_REBUILD=1 to force a rebuild.
+
+set -euo pipefail
+
+# Directory of this script == the Mill module root (utilities/), regardless of
+# where it is invoked from.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+JAR="$SCRIPT_DIR/out/vlog/assembly.dest/out.jar"
+MILL="$SCRIPT_DIR/mill"
+
+build_jar() {
+  echo "Building vlog utility (first run)..." >&2
+  ( cd "$SCRIPT_DIR" && "$MILL" vlog.assembly >&2 )
+}
+
+if [[ "${VLOG_REBUILD:-}" == "1" || ! -f "$JAR" ]]; then
+  build_jar
+fi
+
+exec java -jar "$JAR" "$@"
