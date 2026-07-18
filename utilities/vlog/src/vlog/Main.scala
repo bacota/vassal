@@ -21,7 +21,11 @@ import java.nio.file.Paths
     case "moves" :: path :: Nil => listMoves(path, None)
     case "moves" :: path :: module :: Nil => listMoves(path, Some(module))
     case "locate" :: module :: map :: x :: y :: rest =>
-      locate(module, map, x.toInt, y.toInt, rest.headOption)
+      (scala.util.Try(x.toInt).toOption, scala.util.Try(y.toInt).toOption) match
+        case (Some(xi), Some(yi)) => locate(module, map, xi, yi, rest.headOption)
+        case _ =>
+          System.err.println("Usage: vlog locate <module.vmod> <map> <x> <y> [board]")
+          sys.exit(2)
     case "verify-grid" :: module :: vlog :: map :: Nil => verifyGrid(module, vlog, map)
     case _ =>
       System.err.println(
