@@ -32,15 +32,16 @@ final class ModuleFile private (path: Path):
           .orElse(Option(zip.getEntry(imageName)))
         entry.flatMap { e =>
           Using.resource(zip.getInputStream(e)) { in =>
-            val iis = ImageIO.createImageInputStream(in)
-            val readers = ImageIO.getImageReaders(iis)
-            if readers.hasNext then
-              val r = readers.next()
-              try
-                r.setInput(iis)
-                Some((r.getWidth(0), r.getHeight(0)))
-              finally r.dispose()
-            else None
+            Using.resource(ImageIO.createImageInputStream(in)) { iis =>
+              val readers = ImageIO.getImageReaders(iis)
+              if readers.hasNext then
+                val r = readers.next()
+                try
+                  r.setInput(iis)
+                  Some((r.getWidth(0), r.getHeight(0)))
+                finally r.dispose()
+              else None
+            }
           }
         }
       }
