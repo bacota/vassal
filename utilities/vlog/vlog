@@ -20,11 +20,11 @@ set -euo pipefail
 # where it is invoked from.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 JAR="$SCRIPT_DIR/out/vlog/assembly.dest/out.jar"
-MILL="$SCRIPT_DIR/mill"
+
 
 build_jar() {
   echo "Building vlog utility (first run)..." >&2
-  ( cd "$SCRIPT_DIR" && "$MILL" vlog.assembly >&2 )
+  ( cd "$SCRIPT_DIR" && "mill" vlog.assembly >&2 )
 }
 
 if [[ "${VLOG_REBUILD:-}" == "1" || ! -f "$JAR" ]]; then

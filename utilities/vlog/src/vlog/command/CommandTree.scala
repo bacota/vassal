@@ -32,6 +32,18 @@ object CommandTree:
   def flatten(raw: String): Vector[Command] =
     if raw == null then Vector.empty
     else
-      val tokens = SequenceCodec.decode(raw, CommandSeparator)
-      if tokens.size <= 1 then Vector(CommandCodec.decode(raw))
-      else tokens.flatMap(flatten)
+      // Mirror GameModule.decode exactly: pull off the first token and treat
+      // the string as a genuine leaf only when that token IS the whole string.
+      // If it isn't, the string is a nested subtree — extracting `first`
+      // unescaped its inner ESC delimiters, which must now be flattened
+      // recursively. (Testing `first == raw` rather than the token count
+      // matters when a leaf's data contained an escaped ESC but no unescaped
+      // one: that decodes to a single token that is still not the raw string.)
+      val decoder = new SequenceCodec.Decoder(raw, CommandSeparator)
+      val first = decoder.nextToken()
+      if first == raw then Vector(CommandCodec.decode(raw))
+      else
+        val tokens = Vector.newBuilder[String]
+        tokens += first
+        while decoder.hasMoreTokens do tokens += decoder.nextToken()
+        tokens.result().flatMap(flatten)
