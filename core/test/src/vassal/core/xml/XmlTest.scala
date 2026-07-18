@@ -59,9 +59,11 @@ class XmlTest extends munit.FunSuite {
 
     val domAttrs = dom.getAttributes
     assertEquals(ours.attributes.length, domAttrs.getLength, s"attribute count mismatch on <${ours.name}>")
-    for ((k, v) <- ours.attributes) {
-      assertEquals(v, domAttrs.getNamedItem(k).getNodeValue, s"attribute $k on <${ours.name}>")
-    }
+for ((k, v) <- ours.attributes) {
+  val domAttr = domAttrs.getNamedItem(k)
+  assert(domAttr != null, s"missing attribute $k on <${ours.name}>")
+  assertEquals(v, domAttr.getNodeValue, s"attribute $k on <${ours.name}>")
+}
 
     val domChildElements = domChildrenOf(dom)
     assertEquals(
