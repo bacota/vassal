@@ -18,7 +18,7 @@ final class ModuleFile private (path: Path):
     Using.resource(new ZipFile(path.toFile)) { zip =>
       val entry = Option(zip.getEntry(BuildFile))
         .orElse(Option(zip.getEntry(BuildFileLegacy)))
-        .getOrElse(throw new IllegalArgumentException(s"$path has no $BuildFile"))
+        .getOrElse(throw new IllegalArgumentException(s"$path has no $BuildFile or $BuildFileLegacy"))
       Using.resource(zip.getInputStream(entry)) { in =>
         new String(in.readAllBytes(), StandardCharsets.UTF_8)
       }
