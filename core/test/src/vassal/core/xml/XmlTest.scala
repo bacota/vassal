@@ -1,6 +1,6 @@
 package vassal.core.xml
 
-import org.w3c.dom.{Element => DomElement, Node => DomNode}
+import org.w3c.dom.{Element => DomElement}
 
 class XmlTest extends munit.FunSuite {
 
