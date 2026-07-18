@@ -110,12 +110,13 @@ object GridMath:
     val sign = if rowOrColumn < 0 then "-" else ""
     var v = math.abs(rowOrColumn)
     if kind == 'A' then
-      var x = v
-      val letters = new StringBuilder
-      while x >= 0 do
-        letters.insert(0, Alphabet.charAt(x % 26))
-        x = x / 26 - 1
-      sign + letters.toString
+      val sb = new StringBuilder(sign)
+      var continue = true
+      while continue do
+        sb.append(Alphabet.charAt(v % 26))
+        v -= 26
+        continue = v >= 0
+      sb.toString
     else
       val sb = new StringBuilder(sign)
       var lead = leading
