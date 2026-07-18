@@ -218,7 +218,7 @@ import static java.lang.Math.round;
  * "context menu" services, and {@link StackMetrics} which handles the "stacking" of game pieces.
  */
 public class Map extends AbstractToolbarItem implements GameComponent, MouseListener, MouseMotionListener, DropTargetListener, Configurable,
-    UniqueIdManager.Identifyable, ToolBarComponent, MutablePropertiesContainer, PropertySource, PlayerRoster.SideChangeListener, ComponentDescription {
+    UniqueIdManager.Identifyable, ToolBarComponent, MutablePropertiesContainer, PropertySource, PlayerRoster.SideChangeListener, ComponentDescription, MapModel {
   protected static boolean changeReportingEnabled = true;
   protected String mapID = ""; //$NON-NLS-1$
   protected String mapName = ""; //$NON-NLS-1$
@@ -1141,6 +1141,7 @@ public class Map extends AbstractToolbarItem implements GameComponent, MouseList
    * contains that point, or null if none.
    * @return the {@link Board} on this map containing the argument point
    */
+  @Override
   public Board findBoard(Point p) {
     for (final Board b : boards) {
       if (b.bounds().contains(p)) {
@@ -1155,6 +1156,7 @@ public class Map extends AbstractToolbarItem implements GameComponent, MouseList
    * {@link ZonedGrid} (aka Multi-zoned Grid), returns the Zone. Otherwise returns null.
    * @return the {@link Zone} on this map containing the argument point
    */
+  @Override
   public Zone findZone(Point p) {
     final Board b = findBoard(p);
     if (b != null) {
@@ -1174,6 +1176,7 @@ public class Map extends AbstractToolbarItem implements GameComponent, MouseList
    * @param name Zone Name
    * @return Located zone, or null if not found
    */
+  @Override
   public Zone findZone(String name) {
     for (final Board b : boards) {
       for (final ZonedGrid zg : b.getAllDescendantComponentsOf(ZonedGrid.class)) {
@@ -1191,6 +1194,7 @@ public class Map extends AbstractToolbarItem implements GameComponent, MouseList
    * @param name Region name
    * @return Located region, or null if none
    */
+  @Override
   public Region findRegion(String name) {
     for (final Board b : boards) {
       for (final RegionGrid rg : b.getAllDescendantComponentsOf(RegionGrid.class)) {
@@ -1271,6 +1275,7 @@ public class Map extends AbstractToolbarItem implements GameComponent, MouseList
    * @see Board#snapTo
    * @see VASSAL.build.module.map.boardPicker.board.MapGrid#snapTo
    */
+  @Override
   public Point snapTo(Point p, boolean force, boolean onlyCenter) {
     Point snap = new Point(p);
 
@@ -1484,6 +1489,7 @@ public class Map extends AbstractToolbarItem implements GameComponent, MouseList
    * @param p Point in Map coordinates to scale
    * @return scaled Point in Component coordinates
    */
+  @Override
   public Point mapToComponent(Point p) {
     return scale(p, getZoom());
   }
@@ -1499,6 +1505,7 @@ public class Map extends AbstractToolbarItem implements GameComponent, MouseList
    * @param r Rectangle in Map coordinates to scale
    * @return scaled Rectangle in Component coordinates
    */
+  @Override
   public Rectangle mapToComponent(Rectangle r) {
     return scale(r, getZoom());
   }
@@ -1586,6 +1593,7 @@ public class Map extends AbstractToolbarItem implements GameComponent, MouseList
    * @param p Point in Component coordinates to scale
    * @return scaled Point in Map coordinates
    */
+  @Override
   public Point componentToMap(Point p) {
     return scale(p, 1.0 / getZoom());
   }
@@ -1601,6 +1609,7 @@ public class Map extends AbstractToolbarItem implements GameComponent, MouseList
    * @param r Rectangle in Component coordinates to scale
    * @return scaled Rectangle in Map coordinates
    */
+  @Override
   public Rectangle componentToMap(Rectangle r) {
     return scale(r, 1.0 / getZoom());
   }
@@ -1708,6 +1717,7 @@ public class Map extends AbstractToolbarItem implements GameComponent, MouseList
    *
    * @see Board#locationName
    */
+  @Override
   public String locationName(Point p) {
     String loc = getDeckNameAt(p);
     if (loc == null) {
@@ -2600,6 +2610,7 @@ public class Map extends AbstractToolbarItem implements GameComponent, MouseList
    * in order of visual layer. This is a read-only copy. Altering the array does not alter
    * the pieces on the map.
    */
+  @Override
   public GamePiece[] getAllPieces() {
     return pieces.getAllPieces();
   }
@@ -2614,6 +2625,7 @@ public class Map extends AbstractToolbarItem implements GameComponent, MouseList
   /**
    * @return piece collection for this map (a/k/a its LayeredPieceCollection or "Game Piece Layer Control"), which maintains a list of all the pieces/stacks/decks on the map sorted by visual layer, and within each layer by back-to-front draw order
    */
+  @Override
   public PieceCollection getPieceCollection() {
     return pieces;
   }
@@ -2920,6 +2932,17 @@ public class Map extends AbstractToolbarItem implements GameComponent, MouseList
   }
 
   /**
+   * Clears this map's piece and board collections. This is the pure game-state-mutation
+   * portion of {@link #setup(boolean)}'s game-ending path, isolated from the surrounding
+   * window/toolbar/preferences UI work so it can be reasoned about (and eventually reused)
+   * independently of Swing.
+   */
+  protected void resetState() {
+    pieces.clear();
+    boards.clear();
+  }
+
+  /**
    * When a game is started, create a top-level window, if none exists.
    * When a game is ended, remove all boards from the map.
    * @param show true if a game is starting, false if a game is ending
@@ -3021,8 +3044,7 @@ public class Map extends AbstractToolbarItem implements GameComponent, MouseList
       }
     }
     else {
-      pieces.clear();
-      boards.clear();
+      resetState();
 
       if (!g.isLoadOverSemaphore()) {
         if (shouldDockIntoMainWindow()) {
@@ -3129,6 +3151,7 @@ public class Map extends AbstractToolbarItem implements GameComponent, MouseList
    * @param finder PieceFinder to use
    * @return a visible piece at the given location, or null if none.
    */
+  @Override
   public GamePiece findPiece(Point pt, PieceFinder finder) {
     final GamePiece[] stack = pieces.getPieces();
     for (int i = stack.length - 1; i >= 0; --i) {
@@ -3147,6 +3170,7 @@ public class Map extends AbstractToolbarItem implements GameComponent, MouseList
    * @param finder PieceFinder to use
    * @return a piece at the given location, regardless of visibility, or null if none.
    */
+  @Override
   public GamePiece findAnyPiece(Point pt, PieceFinder finder) {
     final GamePiece[] stack = pieces.getAllPieces();
     // Our piece collection is provided to us in "draw order", in other words "back-to-front", which means
@@ -3248,6 +3272,7 @@ public class Map extends AbstractToolbarItem implements GameComponent, MouseList
    * this map.
    * @param p Game Piece to add
    */
+  @Override
   public void addPiece(GamePiece p) {
     // Temporarily change the piece to be on this map to ensure a CP can calculate a layer.
     // Then return the original map so the piece can be correctly unlinked
@@ -3286,6 +3311,7 @@ public class Map extends AbstractToolbarItem implements GameComponent, MouseList
    * Removes a piece from the map
    * @param p GamePiece to remove from map
    */
+  @Override
   public void removePiece(GamePiece p) {
     GameModule.getGameModule().getIndexManager().pieceRemoved(p, this);
     pieces.remove(p);

@@ -109,6 +109,32 @@ public interface GamePiece extends PropertySource {
   Shape getShape();
 
   /**
+   * @return the {@link PieceRenderer} responsible for this piece's on-screen appearance. By
+   * default this simply wraps this piece's own {@link #draw}/{@link #boundingBox}/{@link #getShape}
+   * methods, so overriding {@link #getRenderer()} alone has no effect unless {@code draw} etc. are
+   * also implemented in terms of it. Traits with dedicated rendering logic may override this to
+   * return a standalone {@link PieceRenderer} implementation.
+   */
+  default PieceRenderer getRenderer() {
+    return new PieceRenderer() {
+      @Override
+      public void draw(Graphics g, int x, int y, Component obs, double zoom) {
+        GamePiece.this.draw(g, x, y, obs, zoom);
+      }
+
+      @Override
+      public Rectangle boundingBox() {
+        return GamePiece.this.boundingBox();
+      }
+
+      @Override
+      public Shape getShape() {
+        return GamePiece.this.getShape();
+      }
+    };
+  }
+
+  /**
    * @return the {@link Stack} to which this piece belongs, or null if it doesn't belong to a stack.
    */
   Stack getParent();

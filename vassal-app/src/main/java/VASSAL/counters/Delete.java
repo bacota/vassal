@@ -197,6 +197,11 @@ public class Delete extends Decorator implements TranslatablePiece {
   }
 
   @Override
+  public PieceRenderer getRenderer() {
+    return piece.getRenderer();
+  }
+
+  @Override
   public PieceEditor getEditor() {
     return new Ed(this);
   }

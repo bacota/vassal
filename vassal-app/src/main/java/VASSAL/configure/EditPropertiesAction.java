@@ -32,6 +32,7 @@ import java.util.Map;
 import javax.swing.AbstractAction;
 
 import VASSAL.build.Configurable;
+import VASSAL.build.ConfigurableEditor;
 import VASSAL.build.module.documentation.HelpWindow;
 import VASSAL.i18n.Resources;
 
@@ -52,7 +53,7 @@ public class EditPropertiesAction extends AbstractAction {
     this.helpWindow = helpWindow;
     this.target = target;
     this.dialogOwner = dialogOwner;
-    setEnabled(target.getConfigurer() != null);
+    setEnabled(ConfigurableEditor.getConfigurerOf(target) != null);
   }
 
   /*

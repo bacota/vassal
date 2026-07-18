@@ -20,6 +20,7 @@ package VASSAL.configure;
 import VASSAL.build.Buildable;
 import VASSAL.build.Builder;
 import VASSAL.build.Configurable;
+import VASSAL.build.ConfigurableEditor;
 import VASSAL.build.GameModule;
 import VASSAL.build.module.Map;
 import VASSAL.build.module.PrototypeDefinition;
@@ -85,7 +86,7 @@ public class PropertiesWindow extends JDialog {
     }
 
     setLayout(new MigLayout("ins panel,wrap 1", "[grow,fill]", "[align top,grow][]")); // NON-NLS
-    configurer = target.getConfigurer();
+    configurer = ConfigurableEditor.getConfigurerOf(target);
     target.addPropertyChangeListener(evt -> {
       if (Configurable.NAME_PROPERTY.equals(evt.getPropertyName())) {
         setTitle((String) evt.getNewValue());

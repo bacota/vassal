@@ -22,6 +22,7 @@ import VASSAL.build.AbstractConfigurable;
 import VASSAL.build.Buildable;
 import VASSAL.build.Builder;
 import VASSAL.build.Configurable;
+import VASSAL.build.ConfigurableEditor;
 import VASSAL.build.GameModule;
 import VASSAL.build.IllegalBuildException;
 import VASSAL.build.module.Chatter;
@@ -382,7 +383,7 @@ public class ConfigureTree extends JTree implements PropertyChangeListener, Mous
         final DefaultMutableTreeNode node = (DefaultMutableTreeNode) path.getLastPathComponent();
         if (isExpanded(path) || (node.getChildCount() == 0)) {
           final Configurable target = (Configurable) ((DefaultMutableTreeNode) path.getLastPathComponent()).getUserObject();
-          if ((target != null) && (target.getConfigurer() != null)) {
+          if ((target != null) && (ConfigurableEditor.getConfigurerOf(target) != null)) {
             final Action a = buildEditAction(target);
             if (a != null) {
               a.actionPerformed(new ActionEvent(ae.getSource(), ActionEvent.ACTION_PERFORMED, "Edit")); //NON-NLS
@@ -1180,7 +1181,7 @@ public class ConfigureTree extends JTree implements PropertyChangeListener, Mous
 
       final int finalIndex = (index < 0) ? getTreeNode(target).getChildCount() : checkMinimumIndex(getTreeNode(target), index);
 
-      if (child.getConfigurer() != null) {
+      if (ConfigurableEditor.getConfigurerOf(child) != null) {
         if (insert(target, child, finalIndex)) {
           if (duplicate != null) {
             updateGpIds(child);
@@ -1595,7 +1596,7 @@ public class ConfigureTree extends JTree implements PropertyChangeListener, Mous
         return;
       }
 
-      if (target.getConfigurer() != null) {
+      if (ConfigurableEditor.getConfigurerOf(target) != null) {
         final Action a = buildEditAction(target);
         if (a != null) {
           a.actionPerformed(new ActionEvent(e.getSource(), ActionEvent.ACTION_PERFORMED, "Edit", e.getModifiersEx())); //NON-NLS
@@ -1830,7 +1831,7 @@ public class ConfigureTree extends JTree implements PropertyChangeListener, Mous
     searchAction.setEnabled(true);
     // Check the cached Configurer in the TreeNode, not the Configurable as Configurable.getConfigurer()
     // is very expensive and resets the Configurer causing label truncation issues in the JTree
-    propertiesAction.setEnabled(selected != null && selected.getConfigurer() != null);
+    propertiesAction.setEnabled(selected != null && ConfigurableEditor.getConfigurerOf(selected) != null);
     translateAction.setEnabled(selected != null);
   }
 

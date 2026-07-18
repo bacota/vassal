@@ -93,6 +93,11 @@ public class Marker extends Decorator implements EditablePiece {
   }
 
   @Override
+  public PieceRenderer getRenderer() {
+    return piece.getRenderer();
+  }
+
+  @Override
   public Object getProperty(Object key) {
     for (int i = 0; i < keys.length; ++i) {
       if (keys[i].equals(key)) {
