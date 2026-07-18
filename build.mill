@@ -26,6 +26,7 @@ object core extends Module {
     object test extends ScalaTests with TestModule.Munit {
       def mvnDeps = Seq(mvn"org.scalameta::munit::${versions.munit}")
       override def sources = Task.Sources(moduleDir / os.up / os.up / "test" / "src")
+      override def resources = Task.Sources(moduleDir / os.up / os.up / "test" / "resources")
     }
   }
 
